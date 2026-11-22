@@ -19,6 +19,9 @@ on:
       - requirements.lock
       - Dockerfile
       - .dockerignore
+  # A mano desde main: la primera entrega de un repositorio nuevo (el primer push no tiene
+  # con qué compararse y el filtro de rutas no lo lanza) o volver a publicar lo que hay en main.
+  workflow_dispatch:
 
 permissions: {}
 
