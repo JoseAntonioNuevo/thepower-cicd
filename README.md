@@ -43,7 +43,7 @@ releases, atestaciones, CodeQL, Dependabot y GitHub Pages.
 |---|---|---|
 | `ci-pr.yml` | Cada pull request hacia `main` | Llama a las comprobaciones. Solo lee el repositorio |
 | `comprobaciones.yml` | Lo llaman la PR y la entrega | Seis jobs en paralelo, un check cada uno (tabla siguiente) |
-| `entrega-main.yml` | Cada integración en `main` que cambie la imagen (`app.py`, `requirements.lock`, `Dockerfile`) | Comprobaciones → **publicar** (GHCR + atestación) → **staging** → **producción** (aprobación + release) → panel |
+| `entrega-main.yml` | Cada integración en `main` que cambie la imagen (`app.py`, `requirements.lock`, `Dockerfile`), o a mano | Comprobaciones → **publicar** (GHCR + atestación) → **staging** → **producción** (aprobación + release) → panel |
 | `rollback.yml` | A mano, con una versión (`v1.0.0`) | Prueba esa imagen y le devuelve la etiqueta `produccion`; también pide aprobación |
 | `vigilancia.yml` | Cada hora y a mano | Arranca producción, envía peticiones sintéticas, abre o cierra la incidencia |
 | `panel.yml` | Al final de los tres anteriores | Publica el panel en GitHub Pages |
@@ -146,10 +146,13 @@ gh api -X PUT "repos/$GH_REPO/actions/permissions/workflow" \
 gh api -X POST "repos/$GH_REPO/pages" -f build_type=workflow     # el panel
 ```
 
-Sube la versión A. `Entrega · main` se queda esperando tu aprobación para producción:
+Sube la versión A y lanza la primera entrega a mano: el primer push de un repositorio no tiene
+con qué compararse y el filtro de rutas de `Entrega · main` no lo lanza solo. Se queda esperando
+tu aprobación para producción:
 
 ```bash
 git push -u origin main
+gh workflow run entrega-main.yml --ref main && sleep 5
 gh run watch "$(gh run list --workflow entrega-main.yml --limit 1 --json databaseId --jq '.[0].databaseId')"
 ```
 
