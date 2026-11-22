@@ -1,0 +1,23 @@
+# Integración continua: se ejecuta en cada pull request hacia main.
+# Solo lee el repositorio: no puede publicar imágenes, crear releases ni desplegar.
+# Los seis checks de comprobaciones.yml son obligatorios para integrar (regla de main).
+name: CI · pull request
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Si se suben más commits a la misma PR, se cancela la ejecución anterior.
+concurrency:
+  group: ci-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    uses: ./.github/workflows/comprobaciones.yml
+    secrets:
+      # Opcional. En una PR desde un fork llega vacío y se evalúan las reglas de la demo.
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}

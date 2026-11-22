@@ -1,0 +1,138 @@
+# Rollback: volver a una versión que ya estuvo en producción, sin reconstruir nada.
+# Se elige la release; su digest vuelve a recibir la etiqueta `produccion` después de
+# probarlo. Pasa por el mismo environment, así que también exige aprobación.
+name: Rollback · producción
+run-name: "Rollback a ${{ inputs.version }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versión publicada a la que volver (por ejemplo, v1.0.0)"
+        required: true
+        type: string
+
+permissions: {}
+
+# Comparte grupo con la entrega: un rollback nunca se cruza con una entrega en marcha.
+concurrency:
+  group: produccion
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  rollback:
+    name: Volver a una versión conocida
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: produccion
+      url: ${{ steps.destino.outputs.url }}
+    permissions:
+      contents: read
+      packages: write # mover la etiqueta «produccion»
+    env:
+      # Lo que escribe una persona entra como variable de entorno, nunca interpolado en el
+      # script: así no puede inyectar comandos.
+      VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Comprobar la rama y el formato de la versión
+        run: |
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "::error::Solo se hace rollback desde main; esta ejecución viene de $GITHUB_REF."
+            exit 1
+          fi
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::La versión debe tener la forma v1.2.3 (las releases del repositorio)."
+            exit 1
+          fi
+
+      - name: Descargar el código (solo para usar scripts/smoke.sh)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Iniciar sesión en GHCR
+        env:
+          TOKEN: ${{ github.token }}
+        run: echo "$TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Localizar la versión elegida y lo que hay ahora
+        id: destino
+        run: |
+          IMAGEN="ghcr.io/${GITHUB_REPOSITORY,,}"
+          DIGEST="$(gh release view "$VERSION" --json body --jq .body 2>/dev/null \
+            | grep -oE 'sha256:[0-9a-f]{64}' | head -1 || true)"
+          [[ -n "$DIGEST" ]] || { echo "::error::No existe la release $VERSION o no indica su digest."; exit 1; }
+          COMMIT="$(gh release view "$VERSION" --json targetCommitish --jq .targetCommitish)"
+          ANTES="$(docker buildx imagetools inspect "$IMAGEN:produccion" \
+            --format '{{json .Manifest}}' | jq -r '.digest')"
+          {
+            echo "imagen=$IMAGEN"
+            echo "digest=$DIGEST"
+            echo "commit=$COMMIT"
+            echo "antes=$ANTES"
+            echo "url=$(gh release view "$VERSION" --json url --jq .url)"
+          } >> "$GITHUB_OUTPUT"
+          echo "Volver a $VERSION: $DIGEST (commit $COMMIT). Ahora: $ANTES"
+
+      - name: Probar la imagen antes de devolverla a producción
+        env:
+          IMAGEN: ${{ steps.destino.outputs.imagen }}
+          DIGEST: ${{ steps.destino.outputs.digest }}
+          COMMIT: ${{ steps.destino.outputs.commit }}
+        run: |
+          docker pull "$IMAGEN@$DIGEST"
+          docker run --rm -d --name api --read-only --cap-drop ALL \
+            -p 127.0.0.1:8000:8000 "$IMAGEN@$DIGEST"
+          bash scripts/smoke.sh http://127.0.0.1:8000 "$COMMIT"
+          docker stop api
+
+      - name: Mover «produccion» al digest de esa versión
+        env:
+          IMAGEN: ${{ steps.destino.outputs.imagen }}
+          DIGEST: ${{ steps.destino.outputs.digest }}
+        run: |
+          docker buildx imagetools create --prefer-index=false --tag "$IMAGEN:produccion" "$IMAGEN@$DIGEST"
+          AHORA="$(docker buildx imagetools inspect "$IMAGEN:produccion" \
+            --format '{{json .Manifest}}' | jq -r '.digest')"
+          [[ "$AHORA" == "$DIGEST" ]] || { echo "::error::produccion señala $AHORA y no $DIGEST"; exit 1; }
+
+      - name: Resumen
+        if: ${{ !cancelled() }}
+        env:
+          DIGEST: ${{ steps.destino.outputs.digest }}
+          ANTES: ${{ steps.destino.outputs.antes }}
+          RESULTADO: ${{ job.status }}
+        run: |
+          {
+            echo "### Rollback a $VERSION · $RESULTADO"
+            echo ""
+            echo "| | Antes | Después |"
+            echo "|---|---|---|"
+            echo "| Digest en producción | \`${ANTES:-sin leer}\` | \`${DIGEST:-sin cambiar}\` |"
+            echo ""
+            echo "No se reconstruyó ni se revirtió ningún commit: vuelve a ejecutarse una imagen ya validada."
+            echo "El arreglo definitivo es otra PR con el test que faltaba."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Cerrar la sesión de Docker
+        if: always()
+        run: docker logout ghcr.io
+
+  panel:
+    needs: rollback
+    if: ${{ !cancelled() }}
+    uses: ./.github/workflows/panel.yml
+    permissions:
+      contents: read
+      packages: read
+      issues: read
+      actions: read
+      pages: write
+      id-token: write

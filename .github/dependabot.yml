@@ -1,0 +1,35 @@
+# Dependabot propone PR con actualizaciones; pasan por el mismo CI que cualquier cambio.
+# Python no está aquí a propósito: requirements.lock (el de Docker) se exporta de uv.lock y una
+# PR del bot no lo regeneraría, así que el check «Calidad» la pararía. Las vulnerabilidades de
+# Python las vigilan pip-audit en cada PR y las alertas de Dependabot del repositorio.
+version: 2
+updates:
+  # Las acciones de los workflows (fijadas por SHA; el bot actualiza SHA y comentario).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Europe/Madrid
+    # No proponer una versión hasta que lleve una semana publicada.
+    cooldown:
+      default-days: 7
+    groups:
+      acciones:
+        patterns: ["*"]
+    commit-message:
+      prefix: deps
+
+  # La imagen base del Dockerfile (fijada por digest).
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Europe/Madrid
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: deps

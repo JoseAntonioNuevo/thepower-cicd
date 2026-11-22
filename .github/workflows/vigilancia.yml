@@ -1,0 +1,159 @@
+# Vigilancia de producción: monitorización sintética con alerta, nativa de GitHub.
+# Cada hora (o a mano) arranca la imagen con la etiqueta `produccion`, le envía peticiones
+# ficticias de las tres prioridades y, si alguna falla, abre una incidencia con la versión,
+# el request_id y la línea de log del error. Cuando vuelve a estar en verde, la cierra.
+# En una plataforma real, la vigilancia llamaría a la URL pública cada minuto; aquí el
+# programador de GitHub no garantiza la hora exacta y el mínimo son 5 minutos.
+name: Vigilancia · producción
+
+on:
+  schedule:
+    - cron: "17 * * * *" # cada hora, a y 17 (UTC)
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: vigilancia
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  vigilar:
+    name: Peticiones sintéticas a producción
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+      issues: write # abrir, comentar y cerrar la incidencia
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Descargar el código (solo para usar scripts/vigilancia.sh)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Iniciar sesión en GHCR
+        env:
+          TOKEN: ${{ github.token }}
+        run: echo "$TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Arrancar lo que hay en producción
+        id: produccion
+        run: |
+          IMAGEN="ghcr.io/${GITHUB_REPOSITORY,,}"
+          if ! docker buildx imagetools inspect "$IMAGEN:produccion" >/dev/null 2>&1; then
+            echo "::notice::Todavía no hay ninguna versión en producción."
+            echo "hay=no" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          DIGEST="$(docker buildx imagetools inspect "$IMAGEN:produccion" \
+            --format '{{json .Manifest}}' | jq -r '.digest')"
+          # La release cuyo texto incluye este digest dice qué versión es.
+          export DIGEST
+          VERSION="$(gh api "repos/$GH_REPO/releases?per_page=50" \
+            --jq '[.[] | select(.body // "" | contains(env.DIGEST))][0].tag_name // "sin release"')"
+          docker pull -q "$IMAGEN@$DIGEST"
+          docker run -d --name api --read-only --cap-drop ALL \
+            -p 127.0.0.1:8000:8000 "$IMAGEN@$DIGEST"
+          {
+            echo "hay=si"
+            echo "digest=$DIGEST"
+            echo "version=$VERSION"
+          } >> "$GITHUB_OUTPUT"
+          echo "Producción: $VERSION ($DIGEST)"
+
+      - name: Enviar las peticiones
+        id: vigilar
+        if: steps.produccion.outputs.hay == 'si'
+        run: |
+          set +e
+          bash scripts/vigilancia.sh http://127.0.0.1:8000 informe.md
+          codigo=$?
+          set -e
+          echo "codigo=$codigo" >> "$GITHUB_OUTPUT"
+          cat informe.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Logs de error del contenedor
+        if: steps.produccion.outputs.hay == 'si'
+        run: |
+          # Solo las líneas JSON de nivel ERROR: identifican la petición sin el texto del usuario.
+          docker logs api 2>&1 | jq -cR 'fromjson? | select(.nivel == "ERROR")' > errores.jsonl || true
+          docker stop api >/dev/null || true
+          if [[ -s errores.jsonl ]]; then
+            { echo "### Logs de error"; echo '```json'; head -c 6000 errores.jsonl; echo '```'; } \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Abrir o actualizar la incidencia
+        if: steps.produccion.outputs.hay == 'si' && steps.vigilar.outputs.codigo != '0'
+        env:
+          VERSION: ${{ steps.produccion.outputs.version }}
+          DIGEST: ${{ steps.produccion.outputs.digest }}
+          EJECUCION: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh label create incidente --color B60205 \
+            --description "Abierta por la vigilancia de producción" --force
+          {
+            echo "La vigilancia de producción ha fallado. Ejecución: $EJECUCION"
+            echo ""
+            echo "| Versión | Digest |"
+            echo "|---|---|"
+            echo "| \`$VERSION\` | \`$DIGEST\` |"
+            echo ""
+            cat informe.md
+            echo "#### Logs de error (cada línea lleva su request_id)"
+            echo '```json'
+            head -c 6000 errores.jsonl
+            echo '```'
+            echo ""
+            echo "**Qué hacer:** si urge, Actions → «Rollback · producción» con la versión anterior."
+            echo "Después, arreglar hacia delante con una PR que incluya el test que faltaba."
+          } > incidencia.md
+          ABIERTA="$(gh issue list --label incidente --state open --limit 1 --json number --jq '.[0].number // empty')"
+          if [[ -n "$ABIERTA" ]]; then
+            gh issue comment "$ABIERTA" --body-file incidencia.md
+          else
+            gh issue create --title "Incidente: la vigilancia de producción falla con $VERSION" \
+              --label incidente --body-file incidencia.md
+          fi
+
+      - name: Cerrar la incidencia si ya se ha recuperado
+        if: steps.produccion.outputs.hay == 'si' && steps.vigilar.outputs.codigo == '0'
+        env:
+          VERSION: ${{ steps.produccion.outputs.version }}
+          EJECUCION: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          ABIERTA="$(gh issue list --label incidente --state open --limit 1 --json number --jq '.[0].number // empty')"
+          if [[ -n "$ABIERTA" ]]; then
+            gh issue close "$ABIERTA" \
+              --comment "Recuperado: la vigilancia vuelve a estar en verde con \`$VERSION\` ($EJECUCION)."
+          fi
+
+      - name: Resultado
+        if: steps.produccion.outputs.hay == 'si' && steps.vigilar.outputs.codigo != '0'
+        run: |
+          echo "::error::La vigilancia de producción ha fallado; revisa la incidencia abierta."
+          exit 1
+
+      - name: Cerrar la sesión de Docker
+        if: always()
+        run: docker logout ghcr.io
+
+  panel:
+    needs: vigilar
+    if: ${{ !cancelled() }}
+    uses: ./.github/workflows/panel.yml
+    permissions:
+      contents: read
+      packages: read
+      issues: read
+      actions: read
+      pages: write
+      id-token: write

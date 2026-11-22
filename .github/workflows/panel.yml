@@ -1,0 +1,74 @@
+# Panel de producción en GitHub Pages: versión en producción, últimas comprobaciones de la
+# vigilancia, entregas, rollbacks e incidencias. Lo llaman al terminar la entrega, el
+# rollback y la vigilancia; también se puede lanzar a mano.
+name: Panel
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions: {}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  construir:
+    name: Construir el panel
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      packages: read
+      issues: read
+      actions: read
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Iniciar sesión en GHCR
+        env:
+          TOKEN: ${{ github.token }}
+        run: echo "$TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Generar la página
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          IMAGEN="ghcr.io/${GITHUB_REPOSITORY,,}"
+          PROD_DIGEST="$(docker buildx imagetools inspect "$IMAGEN:produccion" \
+            --format '{{json .Manifest}}' 2>/dev/null | jq -r '.digest // empty' || true)"
+          export PROD_DIGEST
+          python3 scripts/panel.py _site
+
+      - name: Cerrar la sesión de Docker
+        if: always()
+        run: docker logout ghcr.io
+
+      - name: Guardar la página para Pages
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+
+  publicar:
+    name: Publicar en GitHub Pages
+    needs: construir
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    # Un despliegue de Pages cada vez; el siguiente espera.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - name: Publicar
+        id: pages
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

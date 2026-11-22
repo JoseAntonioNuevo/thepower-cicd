@@ -1,0 +1,7 @@
+# Configuración de zizmor (auditoría de seguridad de los workflows).
+rules:
+  # zizmor propone la sintaxis «$/…» (GitHub, julio de 2026) para llamar a workflows del propio
+  # repositorio. actionlint 1.7.12, la última versión, todavía no la reconoce y la marca como
+  # error. Mantenemos «./…», la forma documentada que validan las dos herramientas.
+  self-repository:
+    disable: true

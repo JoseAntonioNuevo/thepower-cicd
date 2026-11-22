@@ -1,0 +1,12 @@
+{"id": "acceso-cuenta", "texto": "No puedo entrar en mi cuenta ficticia", "categoria": "acceso", "prioridad": "media"}
+{"id": "acceso-contrasena", "texto": "He olvidado la contraseña de mi usuario de pruebas", "categoria": "acceso", "prioridad": "media"}
+{"id": "acceso-movil", "texto": "No me deja iniciar sesión desde el móvil", "categoria": "acceso", "prioridad": "media"}
+{"id": "acceso-urgente", "texto": "Urgente: me han bloqueado el acceso y tengo una entrega hoy", "categoria": "acceso", "prioridad": "alta"}
+{"id": "factura-doble", "texto": "Me han cobrado dos veces la factura ficticia de octubre", "categoria": "facturacion", "prioridad": "media"}
+{"id": "pago-duplicado", "texto": "El pago de mi suscripción ficticia aparece duplicado", "categoria": "facturacion", "prioridad": "media"}
+{"id": "servicio-caido", "texto": "El servicio está caído para todos los usuarios de la oficina", "categoria": "tecnico", "prioridad": "alta"}
+{"id": "error-urgente", "texto": "Urgente: la aplicación da un error al guardar y nadie puede trabajar", "categoria": "tecnico", "prioridad": "alta"}
+{"id": "exportacion-falla", "texto": "La exportación a PDF falla con archivos grandes", "categoria": "tecnico", "prioridad": "media"}
+{"id": "duda-horarios", "texto": "Tengo una duda sobre los horarios de atención", "categoria": "consulta", "prioridad": "baja"}
+{"id": "duda-formacion", "texto": "¿Ofrecéis formación para nuevos empleados ficticios?", "categoria": "consulta", "prioridad": "baja"}
+{"id": "duda-descuento", "texto": "Quiero saber si hay descuento para estudiantes", "categoria": "consulta", "prioridad": "baja"}
