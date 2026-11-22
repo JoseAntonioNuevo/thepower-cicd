@@ -12,11 +12,13 @@ name: Entrega · main
 on:
   push:
     branches: [main]
-    # Un cambio solo de documentación no genera una versión nueva de producción.
-    paths-ignore:
-      - "docs/**"
-      - "cambios/**"
-      - "**/*.md"
+    # Solo hay versión nueva cuando cambia lo que va dentro de la imagen. Los cambios de
+    # tests, workflows o documentación ya los validó la PR y no alteran el artefacto.
+    paths:
+      - app.py
+      - requirements.lock
+      - Dockerfile
+      - .dockerignore
 
 permissions: {}
 
