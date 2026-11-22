@@ -43,7 +43,7 @@ releases, atestaciones, CodeQL, Dependabot y GitHub Pages.
 |---|---|---|
 | `ci-pr.yml` | Cada pull request hacia `main` | Llama a las comprobaciones. Solo lee el repositorio |
 | `comprobaciones.yml` | Lo llaman la PR y la entrega | Seis jobs en paralelo, un check cada uno (tabla siguiente) |
-| `entrega-main.yml` | Cada integración en `main` (salvo si solo cambia documentación) | Comprobaciones → **publicar** (GHCR + atestación) → **staging** → **producción** (aprobación + release) → panel |
+| `entrega-main.yml` | Cada integración en `main` que cambie la imagen (`app.py`, `requirements.lock`, `Dockerfile`) | Comprobaciones → **publicar** (GHCR + atestación) → **staging** → **producción** (aprobación + release) → panel |
 | `rollback.yml` | A mano, con una versión (`v1.0.0`) | Prueba esa imagen y le devuelve la etiqueta `produccion`; también pide aprobación |
 | `vigilancia.yml` | Cada hora y a mano | Arranca producción, envía peticiones sintéticas, abre o cierra la incidencia |
 | `panel.yml` | Al final de los tres anteriores | Publica el panel en GitHub Pages |

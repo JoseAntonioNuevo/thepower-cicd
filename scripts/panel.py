@@ -35,21 +35,43 @@ def api(ruta: str):
     return json.loads(salida.stdout)
 
 
+def estado_sin_panel(jobs: list[dict], estado_de_la_ejecucion: str) -> str:
+    """Resultado de una ejecución sin contar los jobs del panel.
+
+    El panel se construye al final de la propia entrega, rollback o vigilancia: en ese momento
+    su ejecución sigue «en curso». Si el resto de jobs ya terminó, su resultado es el real.
+    """
+    principales = [j for j in jobs if not j["name"].startswith("panel")]
+    if not principales or any(j["status"] != "completed" for j in principales):
+        return estado_de_la_ejecucion
+    conclusiones = {j["conclusion"] for j in principales}
+    for mala in ("failure", "timed_out", "cancelled"):
+        if mala in conclusiones:
+            return "failure" if mala == "timed_out" else mala
+    return "success"
+
+
 def ejecuciones(repo: str, archivo: str, cuantas: int) -> list[dict]:
     try:
         datos = api(f"repos/{repo}/actions/workflows/{archivo}/runs?per_page={cuantas}")
     except subprocess.CalledProcessError:  # el workflow aún no existe en main
         return []
-    return [
-        {
-            "titulo": r["display_title"],
-            "workflow": r["name"],
-            "estado": r["conclusion"] or r["status"],
-            "fecha": r["created_at"],
-            "url": r["html_url"],
-        }
-        for r in datos["workflow_runs"]
-    ]
+    resultado = []
+    for r in datos["workflow_runs"]:
+        estado = r["conclusion"] or r["status"]
+        if r["status"] != "completed":
+            jobs = api(f"repos/{repo}/actions/runs/{r['id']}/jobs?per_page=50")["jobs"]
+            estado = estado_sin_panel(jobs, estado)
+        resultado.append(
+            {
+                "titulo": r["display_title"],
+                "workflow": r["name"],
+                "estado": estado,
+                "fecha": r["created_at"],
+                "url": r["html_url"],
+            }
+        )
+    return resultado
 
 
 def recoger(repo: str, prod_digest: str) -> dict:

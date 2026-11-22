@@ -75,3 +75,27 @@ def test_sin_nada_publicado_no_falla():
     vacio = datos("") | {"releases": [], "vigilancia": [], "cambios": [], "incidentes": []}
     pagina = panel.render(vacio)
     assert "Todavía no hay una versión en producción." in pagina
+
+
+def job(nombre: str, estado: str, conclusion: str | None) -> dict:
+    return {"name": nombre, "status": estado, "conclusion": conclusion}
+
+
+def test_una_ejecucion_cuenta_su_resultado_aunque_el_panel_siga_en_marcha():
+    vigilancia = [
+        job("Peticiones sintéticas a producción", "completed", "failure"),
+        job("panel / Construir el panel", "in_progress", None),
+    ]
+    assert panel.estado_sin_panel(vigilancia, "in_progress") == "failure"
+    entrega = [
+        job("comprobaciones / Tests", "completed", "success"),
+        job("Producción", "completed", "success"),
+        job("panel / Construir el panel", "in_progress", None),
+    ]
+    assert panel.estado_sin_panel(entrega, "in_progress") == "success"
+
+
+def test_si_falta_algo_por_terminar_se_mantiene_el_estado_de_la_ejecucion():
+    esperando = [job("Staging", "completed", "success"), job("Producción", "waiting", None)]
+    assert panel.estado_sin_panel(esperando, "waiting") == "waiting"
+    assert panel.estado_sin_panel([job("Staging", "completed", "timed_out")], "x") == "failure"
