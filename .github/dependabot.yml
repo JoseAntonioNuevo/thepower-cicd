@@ -31,5 +31,11 @@ updates:
       timezone: Europe/Madrid
     cooldown:
       default-days: 7
+    # Solo parches de la misma Python (3.12): requirements.lock tiene hashes de paquetes para
+    # 3.12, así que pasar a otra versión es un cambio deliberado de pyproject y del lock, no
+    # una actualización automática. El check «Imagen» lo bloquearía de todos modos.
+    ignore:
+      - dependency-name: python
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
     commit-message:
       prefix: deps
