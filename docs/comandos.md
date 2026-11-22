@@ -15,6 +15,20 @@ Pestañas abiertas antes de conectar: el repositorio, **Actions**, **Pull reques
 `v1.0.0`, **Settings → Environments**, **Settings → Rules** y el panel
 (`https://joseantonionuevo.github.io/thepower-cicd/`).
 
+### Tiempos medidos en el ensayo completo (23/11/2026, repositorio gemelo)
+
+| Paso | Tiempo |
+|---|---|
+| Seis checks obligatorios de una PR (desde el push) | 22–32 s (CodeQL ≈1 min aparte) |
+| `Entrega · main` hasta pedir la aprobación (checks, publicar, staging) | ≈75 s |
+| Producción tras aprobar (+ panel) | ≈15 s (+ 30 s) |
+| Vigilancia hasta el rojo y la incidencia (+ panel) | ≈30 s (+ 25 s) |
+| Rollback tras aprobar | ≈30 s |
+
+Resultado: PR con fallo bloqueada; B en verde y publicada como `v1.1.0`; la vigilancia abrió la
+incidencia con el `KeyError`; rollback a `v1.0.0`; la vigilancia la cerró sola; arreglo publicado
+como `v1.2.0` y vigilancia en verde.
+
 ## 0. Antes de conectar (no se proyecta)
 
 ```bash
@@ -49,7 +63,7 @@ git apply cambios/01-pr-con-fallo.patch
 git commit -qam "Responder algo por defecto si falla el proveedor"
 git push -u origin HEAD
 gh pr create --fill
-gh pr checks --watch                   # ci / Tests en rojo; el resto en verde
+gh pr checks --watch --required        # ci / Tests en rojo; el resto en verde
 gh pr view --json mergeStateStatus     # BLOCKED
 gh pr close --delete-branch && git switch main
 ```
@@ -67,7 +81,7 @@ tras revertir, todo verde y merge `CLEAN`.
 git switch -c plazo-de-atencion
 git apply cambios/02-version-b.patch
 git commit -qam "Añadir el plazo de atención (versión B)"
-git push -u origin HEAD && gh pr create --fill && gh pr checks --watch   # todo verde
+git push -u origin HEAD && gh pr create --fill && gh pr checks --watch --required   # todo verde
 gh pr merge --squash --delete-branch && git switch main && git pull --ff-only
 gh run watch "$(ultima entrega-main.yml)"
 ```
@@ -138,7 +152,7 @@ git switch -c plazo-para-todas-las-prioridades
 git apply --include='tests/*' cambios/03-test-que-faltaba.patch && uv run pytest -q   # 1 failed
 git apply --exclude='tests/*' cambios/03-test-que-faltaba.patch && uv run pytest -q   # todo verde
 git commit -qam "Plazo de atención para todas las prioridades" && git push -u origin HEAD
-gh pr create --fill && gh pr checks --watch
+gh pr create --fill && gh pr checks --watch --required
 ```
 
 Si da tiempo: integrar, aprobar `v1.2.0` y lanzar la vigilancia (verde).

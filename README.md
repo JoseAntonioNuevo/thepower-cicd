@@ -144,7 +144,11 @@ done
 gh api -X PUT "repos/$GH_REPO/actions/permissions/workflow" \
   -f default_workflow_permissions=read -F can_approve_pull_request_reviews=false
 gh api -X POST "repos/$GH_REPO/pages" -f build_type=workflow     # el panel
+gh api -X PUT "repos/$GH_REPO/vulnerability-alerts"   # grafo de dependencias (lo necesita «Dependencias»)
 ```
+
+`--required` en `gh pr checks --watch` espera solo a los checks obligatorios: las apps de terceros
+instaladas en tu cuenta (revisores automáticos, escáneres) pueden tardar varios minutos más.
 
 Sube la versión A y lanza la primera entrega a mano: el primer push de un repositorio no tiene
 con qué compararse y el filtro de rutas de `Entrega · main` no lo lanza solo. Se queda esperando
@@ -174,7 +178,7 @@ status checks to pass* con `ci / Calidad`, `ci / Tests`, `ci / Evaluación`, `ci
 git switch -c respuesta-por-defecto
 git apply cambios/01-pr-con-fallo.patch
 git commit -am "Responder algo por defecto si falla el proveedor"
-git push -u origin HEAD && gh pr create --fill && gh pr checks --watch
+git push -u origin HEAD && gh pr create --fill && gh pr checks --watch --required
 ```
 
 El cambio parece razonable, pero inventa una respuesta cuando el proveedor falla. Dos tests lo
@@ -187,7 +191,7 @@ detectan, el check **Tests** queda en rojo y la PR no se puede integrar. Ciérra
 git switch main && git switch -c plazo-de-atencion
 git apply cambios/02-version-b.patch
 git commit -am "Añadir el plazo de atención (versión B)"
-git push -u origin HEAD && gh pr create --fill && gh pr checks --watch
+git push -u origin HEAD && gh pr create --fill && gh pr checks --watch --required
 gh pr merge --squash --delete-branch && git switch main && git pull
 ```
 
