@@ -63,6 +63,7 @@ def test_marca_la_version_en_produccion_por_su_digest():
     assert 'v1.1.0</a> <span class="marca">' not in pagina
     assert "25/11/2026 18:30" in pagina  # hora de Madrid
     assert "esperando aprobación" in pagina
+    assert '<span class="estado ko">abierta</span>' in pagina
 
 
 def test_escapa_el_texto_que_viene_de_github():

@@ -27,6 +27,8 @@ ESTADOS = {
     "waiting": ("pend", "esperando aprobación"),
     "in_progress": ("pend", "en curso"),
     "queued": ("pend", "en cola"),
+    "abierta": ("ko", "abierta"),
+    "cerrada": ("ok", "cerrada"),
 }
 
 
@@ -51,7 +53,7 @@ def estado_sin_panel(jobs: list[dict], estado_de_la_ejecucion: str) -> str:
     return "success"
 
 
-def ejecuciones(repo: str, archivo: str, cuantas: int) -> list[dict]:
+def ejecuciones(repo: str, archivo: str, cuantas: int, etiqueta: str) -> list[dict]:
     try:
         datos = api(f"repos/{repo}/actions/workflows/{archivo}/runs?per_page={cuantas}")
     except subprocess.CalledProcessError:  # el workflow aún no existe en main
@@ -65,7 +67,7 @@ def ejecuciones(repo: str, archivo: str, cuantas: int) -> list[dict]:
         resultado.append(
             {
                 "titulo": r["display_title"],
-                "workflow": r["name"],
+                "workflow": etiqueta,  # el nombre de la ejecución cambia con run-name
                 "estado": estado,
                 "fecha": r["created_at"],
                 "url": r["html_url"],
@@ -103,9 +105,10 @@ def recoger(repo: str, prod_digest: str) -> dict:
         "prod_digest": prod_digest,
         "generado": datetime.now(UTC).isoformat(),
         "releases": releases,
-        "vigilancia": ejecuciones(repo, "vigilancia.yml", 24),
+        "vigilancia": ejecuciones(repo, "vigilancia.yml", 24, "Vigilancia"),
         "cambios": sorted(
-            ejecuciones(repo, "entrega-main.yml", 8) + ejecuciones(repo, "rollback.yml", 8),
+            ejecuciones(repo, "entrega-main.yml", 8, "Entrega")
+            + ejecuciones(repo, "rollback.yml", 8, "Rollback"),
             key=lambda r: r["fecha"],
             reverse=True,
         )[:10],
@@ -175,7 +178,7 @@ def render(datos: dict) -> str:
     )
     filas_incidentes = "".join(
         f'<tr><td><a href="{e(i["url"])}">#{i["numero"]}</a></td><td>{e(i["titulo"])}</td>'
-        f"<td>{estado('failure') if i['abierto'] else estado('success')}</td>"
+        f"<td>{estado('abierta') if i['abierto'] else estado('cerrada')}</td>"
         f"<td>{fecha(i['fecha'])}</td></tr>"
         for i in datos["incidentes"]
     )
