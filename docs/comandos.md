@@ -37,11 +37,11 @@ sed -n '1,30p' .github/workflows/entrega-main.yml
 ```bash
 uv export --locked --no-dev --no-emit-project --no-header --format requirements-txt | diff -u requirements.lock -
 uv run ruff check . && uv run ruff format --check .
-uv run pytest -q --cov                 # 36 passed, cobertura ≈96 %
+uv run pytest -q --cov                 # 38 passed, cobertura ≈96 %
 uv run python -m evaluacion.evaluar    # 11/12 (91,7 %) · umbral 80 %
 ```
 
-## Bloque 2 · Demo: una PR con un fallo queda bloqueada (≈1,5 min de checks)
+## Bloque 2 · Demo: una PR con un fallo queda bloqueada (≈30 s de checks; CodeQL ≈1 min)
 
 ```bash
 git switch -c respuesta-por-defecto
@@ -55,7 +55,11 @@ gh pr close --delete-branch && git switch main
 ```
 
 En la PR: los seis checks en paralelo, el botón de merge bloqueado y, en **Files changed**, las
-anotaciones de CodeQL si las hay. Local: `uv run pytest -q` → `2 failed`.
+anotaciones de CodeQL si las hay. También aparecen GitGuardian y CodeRabbit: son apps instaladas
+en la cuenta, no workflows del repositorio (checks de terceros). Local: `uv run pytest -q` → `2 failed`.
+
+Ensayado el 23/11/2026 (PR #2): `ci / Tests` en rojo con `2 failed, 34 passed`, merge `BLOCKED`;
+tras revertir, todo verde y merge `CLEAN`.
 
 ## Bloque 3 · Demo: la versión B pasa todo y se publica
 
