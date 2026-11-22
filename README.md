@@ -60,7 +60,8 @@ releases, atestaciones, CodeQL, Dependabot y GitHub Pages.
 | **Workflows** | `actionlint`, `zizmor` y `shellcheck` | El pipeline también es código y se revisa |
 
 CodeQL (análisis de seguridad de GitHub) también se ejecuta en cada PR, pero no es obligatorio:
-tarda más de dos minutos.
+tarda más que el resto (≈1 min) y sus avisos se revisan en **Security**. En el ensayo del
+23/11/2026 los seis checks obligatorios terminaron en unos 30 segundos.
 
 La **evaluación** mide las reglas de la demo (gratis y deterministas: 11 de 12, porque las reglas
 no entienden «iniciar sesión»). Si se añade el secreto `OPENROUTER_API_KEY`, el mismo job evalúa
@@ -86,7 +87,7 @@ Requisitos: Python 3.12, [uv](https://docs.astral.sh/uv/) 0.13.7, Docker, `git`,
 ```bash
 uv sync --locked                       # exactamente lo que dice uv.lock
 uv run ruff check . && uv run ruff format --check .
-uv run pytest --cov                    # 36 pruebas, sin red
+uv run pytest --cov                    # 38 pruebas, sin red
 uv run python -m evaluacion.evaluar    # 11/12 (91,7 %) · umbral 80 %
 ```
 
