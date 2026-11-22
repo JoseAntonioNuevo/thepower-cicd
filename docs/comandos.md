@@ -72,9 +72,10 @@ En la ejecución de `Entrega · main`: el grafo comprobaciones → publicar → 
 y el resumen de **Publicar imagen** con el digest. Mientras espera la aprobación:
 
 ```bash
-DIGEST_B="$(gh run view "$(ultima entrega-main.yml)" --log 2>/dev/null | grep -oE 'Digest publicado: sha256:[0-9a-f]{64}' | head -1 | cut -d' ' -f3)"
+IMAGEN=ghcr.io/joseantonionuevo/thepower-cicd   # paquete público: no hace falta iniciar sesión
+DIGEST_B="$(docker buildx imagetools inspect "$IMAGEN:$(git rev-parse HEAD)" --format '{{json .Manifest}}' | jq -r .digest)"
 echo "$DIGEST_B"
-gh attestation verify "oci://ghcr.io/joseantonionuevo/thepower-cicd@$DIGEST_B" --repo "$GH_REPO"
+gh attestation verify "oci://$IMAGEN@$DIGEST_B" --repo "$GH_REPO"
 ```
 
 ## Bloque 4 · Demo: staging y aprobación de producción

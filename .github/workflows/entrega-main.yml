@@ -12,6 +12,11 @@ name: Entrega · main
 on:
   push:
     branches: [main]
+    # Un cambio solo de documentación no genera una versión nueva de producción.
+    paths-ignore:
+      - "docs/**"
+      - "cambios/**"
+      - "**/*.md"
 
 permissions: {}
 
