@@ -53,7 +53,7 @@ sed -n '1,30p' .github/workflows/entrega-main.yml
 uv export --locked --no-dev --no-emit-project --no-header --format requirements-txt | diff -u requirements.lock -
 uv run ruff check . && uv run ruff format --check .
 uv run pytest -q --cov                 # 38 passed, cobertura ≈96 %
-uv run python -m evaluacion.evaluar    # 11/12 (91,7 %) · umbral 80 %
+uv run python -m evaluacion.evaluar    # 12/12 (100 %) · umbral 80 %
 ```
 
 ## Bloque 2 · Demo: dos PR con un fallo quedan bloqueadas (≈30 s de checks; CodeQL ≈1 min)

@@ -79,14 +79,15 @@ def test_las_reglas_de_la_demo_superan_el_umbral(monkeypatch, tmp_path, capsys):
     assert main([]) == 0
     texto = resumen_github.read_text(encoding="utf-8")
     assert "`reglas-demo`" in texto
-    assert "11/12" in texto  # las reglas no entienden «iniciar sesión»: un fallo real
+    assert "12/12" in texto
     assert "::error" not in capsys.readouterr().out
 
 
 def test_por_debajo_del_umbral_la_evaluacion_falla(monkeypatch, capsys):
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    # Un proveedor que no responde no acierta ningún caso: 0 % frente al 80 % exigido.
     monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
-    assert main(["--umbral", "1"]) == 1
+    monkeypatch.setattr("evaluacion.evaluar.crear_proveedor", lambda cliente: DobleCaido())
+    assert main([]) == 1
     assert "::error title=Evaluación por debajo del umbral::" in capsys.readouterr().out
 
 
