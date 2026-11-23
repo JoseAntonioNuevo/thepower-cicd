@@ -33,8 +33,9 @@ releases, atestaciones, CodeQL, Dependabot y GitHub Pages.
 | `scripts/smoke.sh` | Comprobación tras desplegar: salud, versión, una clasificación y un 422 |
 | `scripts/vigilancia.sh` | Vigilancia sintética: tres peticiones, una por prioridad |
 | `scripts/panel.py` | Genera el panel de producción que publica GitHub Pages |
-| `cambios/` | Cuatro parches para la clase: un import sin usar, PR con fallo, versión B y el test que faltaba |
-| `scripts/abrir-pr.sh` | Abre cada PR de la demo con un comando: `calidad`, `tests`, `verde`, `arreglo` y `cerrar` |
+| `cambios/` | Los dos cambios de la demo: uno correcto y otro incorrecto (cada uno en su rama) |
+| `scripts/comprobar.sh` | Los seis checks de la PR, en local, con un resumen de qué pasaría en GitHub |
+| `scripts/abrir-pr.sh` | Prepara las dos ramas de la demo y abre su PR con un comando |
 | `extras/` | Despliegue sin corte en local, migración compatible y prueba de restauración |
 | `docs/` | Guion de clase, comandos en orden y práctica opcional |
 
@@ -87,6 +88,15 @@ Requisitos: Python 3.12, [uv](https://docs.astral.sh/uv/) 0.13.7, Docker, `git`,
 
 ```bash
 uv sync --locked                       # exactamente lo que dice uv.lock
+bash scripts/comprobar.sh              # los seis checks de la PR, en local: 6/6 en verde
+```
+
+`comprobar.sh` ejecuta lo mismo que GitHub en cada PR (lock y ruff, tests con cobertura,
+evaluación, imagen con smoke, `pip-audit` y la revisión de los workflows) y no se para en el
+primer fallo: al final dice qué checks quedarían en rojo. Con `--rapido`, solo los tres primeros.
+Por separado:
+
+```bash
 uv run ruff check . && uv run ruff format --check .
 uv run pytest --cov                    # 38 pruebas, sin red
 uv run python -m evaluacion.evaluar    # 12/12 (100 %) · umbral 80 %
@@ -173,93 +183,62 @@ status checks to pass* con `ci / Calidad`, `ci / Tests`, `ci / Evaluación`, `ci
 
 ## 3. El recorrido de la clase
 
-Cada PR de la demo se abre con un comando, desde `main` limpio y al día. `bash scripts/abrir-pr.sh`
-crea la rama, aplica el parche de `cambios/`, hace el commit, la sube y abre la PR; con
-`SOLO_LOCAL=1` lo hace todo en local y enseña lo que dirían ruff y pytest, sin tocar GitHub.
-Debajo de cada apartado están los pasos a mano, por si quieres verlos.
+Dos ramas con un cambio cada una y el mismo camino para las dos: primero los checks en local y
+después la PR. `bash scripts/abrir-pr.sh preparar` crea las ramas desde `main` (aplica los parches
+de `cambios/`) y las sube.
 
-### 3.1 Dos PR con un fallo quedan bloqueadas
+| Rama | Cambio | Resultado |
+|---|---|---|
+| `plazo-de-atencion` | Correcto: `sla_horas` según la prioridad, con un test para cada una | Seis checks en verde |
+| `respuesta-por-defecto` | Incorrecto: inventa una respuesta si falla el proveedor y deja un import sin usar | Calidad y Tests en rojo |
 
-```bash
-bash scripts/abrir-pr.sh calidad   # un import sin usar: solo ci / Calidad en rojo
-bash scripts/abrir-pr.sh tests     # una respuesta inventada: solo ci / Tests en rojo
-```
-
-Cada check atrapa un tipo de error distinto: ruff marca el import en la misma línea del diff
-(**Files changed**) y los tests detectan un cambio de comportamiento que compila y arranca. A mano,
-la segunda:
+### 3.1 El cambio correcto pasa los seis checks
 
 ```bash
-git switch -c respuesta-por-defecto
-git apply cambios/01-pr-con-fallo.patch
-git commit -am "Responder algo por defecto si falla el proveedor"
-git push -u origin HEAD && gh pr create --fill && gh pr checks --watch --required
+git switch plazo-de-atencion
+bash scripts/comprobar.sh              # ✅ 6/6 en verde
+bash scripts/abrir-pr.sh correcto      # la PR: los seis checks en verde
+gh pr checks plazo-de-atencion --watch --required
 ```
 
-El cambio parece razonable, pero inventa una respuesta cuando el proveedor falla. Dos tests lo
-detectan, el check **Tests** queda en rojo y la PR no se puede integrar. Ciérralas:
-`bash scripts/abrir-pr.sh cerrar` (o `gh pr close --delete-branch` en cada una).
-
-### 3.2 La versión B pasa todo y llega a producción
+### 3.2 El cambio incorrecto queda bloqueado
 
 ```bash
-bash scripts/abrir-pr.sh verde     # los seis checks en verde
-gh pr merge plazo-de-atencion --squash --delete-branch && git pull --ff-only
+git switch respuesta-por-defecto
+bash scripts/comprobar.sh              # ❌ Calidad y Tests, con la causa debajo
+bash scripts/abrir-pr.sh incorrecto    # la PR: los mismos dos checks en rojo
+gh pr view respuesta-por-defecto --json mergeStateStatus   # BLOCKED
 ```
 
-A mano:
+El cambio parece razonable, pero inventa una respuesta cuando el proveedor falla: dos tests lo
+detectan. Además deja un `import logging` sin usar: ruff lo anota en la línea del diff. Ciérrala
+con `bash scripts/abrir-pr.sh cerrar incorrecto`.
+
+### 3.3 El cambio correcto llega a producción
 
 ```bash
-git switch main && git switch -c plazo-de-atencion
-git apply cambios/02-version-b.patch
-git commit -am "Añadir el plazo de atención (versión B)"
-git push -u origin HEAD && gh pr create --fill && gh pr checks --watch --required
-gh pr merge --squash --delete-branch && git switch main && git pull
+gh pr merge plazo-de-atencion --squash --delete-branch && git switch main && git pull
 ```
 
-`Entrega · main` publica B, la prueba en staging y espera tu aprobación. Al aprobar, B pasa a
-producción como `v1.1.0`. Comprueba la procedencia del artefacto:
+`Entrega · main` publica la imagen, la prueba en staging y espera tu aprobación. Al aprobar, pasa
+a producción como `v1.1.0`. Comprueba la procedencia del artefacto:
 
 ```bash
 gh release view v1.1.0                                   # imagen y digest
 gh attestation verify oci://ghcr.io/USUARIO/mi-cicd@sha256:… --repo "$GH_REPO"
 ```
 
-### 3.3 La vigilancia encuentra un fallo que los tests no cubrían
+### 3.4 Vigilancia y rollback
 
 ```bash
-gh workflow run vigilancia.yml && sleep 5
-gh run watch "$(gh run list --workflow vigilancia.yml --limit 1 --json databaseId --jq '.[0].databaseId')"
-gh issue list --label incidente
+gh workflow run vigilancia.yml                          # tres peticiones, una por prioridad
+gh workflow run rollback.yml -f version=v1.0.0          # simulacro: la versión anterior, sin reconstruir
+gh workflow run rollback.yml -f version=v1.1.0          # y de vuelta
 ```
 
-La vigilancia envía una consulta de prioridad baja y B responde 500: calcula el plazo con un
-diccionario al que le falta `baja`. La incidencia trae la versión, el digest y la línea de log
-`excepcion` con `error_tipo: KeyError`, localizada por su `request_id`. El panel (GitHub Pages)
-la muestra en rojo.
-
-### 3.4 Rollback: la versión anterior, sin reconstruir
-
-```bash
-gh workflow run rollback.yml -f version=v1.0.0
-```
-
-Apruébalo (también es producción). El workflow prueba la imagen de `v1.0.0` y le devuelve la
-etiqueta `produccion`. Lanza otra vez la vigilancia: en verde, y cierra la incidencia sola.
-
-### 3.5 Arreglar hacia delante
-
-```bash
-bash scripts/abrir-pr.sh arreglo   # en local: el test nuevo en rojo, el arreglo en verde; abre la PR
-```
-
-A mano:
-
-```bash
-git switch -c plazo-para-todas-las-prioridades
-git apply --include='tests/*' cambios/03-test-que-faltaba.patch   # el test, en rojo
-git apply --exclude='tests/*' cambios/03-test-que-faltaba.patch   # y el arreglo
-```
+Los dos rollbacks se aprueban (también son producción). El workflow prueba la imagen de esa versión
+y le devuelve la etiqueta `produccion`. Si la vigilancia falla, abre una incidencia con la etiqueta
+`incidente` (versión, digest, `request_id` y la línea de log) y la cierra sola cuando vuelve a verde.
 
 ## 4. Retirar
 

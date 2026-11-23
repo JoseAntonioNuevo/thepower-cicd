@@ -4,28 +4,41 @@
 Presentación: `material/S18/presentaciones/S18-cicd-monitorizacion.pptx` (42 diapositivas).
 Comandos exactos, en el mismo orden: [comandos.md](comandos.md).
 
-> **Cambio del 23/11/2026: demo nativa de GitHub.** La demo en directo ya no despliega en AWS:
-> usa el repositorio público `JoseAntonioNuevo/thepower-cicd` con Actions, GHCR, environments,
-> releases, vigilancia y panel en Pages (todo gratuito). El guion y las 42 diapositivas siguen
-> ese recorrido, con resultados y capturas reales del ensayo en GitHub del 23/11. AWS aparece
-> solo como «en una plataforma real» (versión completa en `material/S18/referencia-aws/`).
+La demo es **nativa de GitHub** (repositorio público `JoseAntonioNuevo/thepower-cicd`: Actions,
+GHCR, environments, releases, vigilancia y panel en Pages, todo gratuito). AWS aparece solo como
+«en una plataforma real» (versión completa en `material/S18/referencia-aws/`).
+
+## La idea de la demo
+
+Dos ramas preparadas, con un cambio cada una, y el mismo recorrido para las dos:
+
+| Rama | Cambio | En local (`scripts/comprobar.sh`) | En la PR |
+|---|---|---|---|
+| `plazo-de-atencion` | **Correcto**: `sla_horas` en cada respuesta (alta 4 h, media 24 h, baja 72 h) y un test por prioridad | ✅ 6/6 · 41 passed | Seis checks en verde, merge permitido |
+| `respuesta-por-defecto` | **Incorrecto**: inventa una respuesta si falla el proveedor y deja un `import logging` sin usar | ❌ Calidad y Tests | Calidad y Tests en rojo, merge bloqueado |
+
+Primero la verde y luego la roja: en cada una, los checks **en local** y después la **PR real**.
+Así se ve que la PR ejecuta exactamente lo mismo que el portátil, en una máquina limpia, y que la
+regla de `main` convierte el rojo en un bloqueo. Después, la verde sigue el camino completo:
+integrar → publicar → staging → aprobación → `v1.1.0` en producción → vigilancia → rollback
+(como simulacro). El fallo en producción que encuentra la vigilancia se enseña con la incidencia
+real del ensayo (diapositivas 35 y 37): con un cambio correcto no hay nada que encontrar.
 
 La teoría y la demo se alternan: cada bloque termina en algo que se ve en pantalla y en una
 pregunta para el grupo. La práctica posterior es **opcional** (aclaración de Laura del 04/11).
 
 ## Antes de conectar
 
+- `gh auth status`: la cuenta **activa** debe ser `JoseAntonioNuevo`; `scripts/abrir-pr.sh` se
+  para si la activa solo puede leer (`gh auth switch --user JoseAntonioNuevo`).
 - Terminal con letra grande en `~/Documents/the-power/thepower-cicd`, en `main` y al día;
   `uv sync --locked` hecho. Docker arrancado e imagen local de respaldo construida (comandos.md, paso 0).
+- Las dos ramas existen en GitHub (`git ls-remote --heads origin plazo-de-atencion
+  respuesta-por-defecto`); si no, `bash scripts/abrir-pr.sh preparar`.
 - Pestañas: el repositorio, **Actions**, **Pull requests**, la release `v1.0.0`,
   **Settings → Environments**, **Settings → Rules** y el panel en GitHub Pages.
-- Estado de partida comprobado: `v1.0.0` (versión A) en producción, ninguna incidencia abierta,
-  ninguna PR de la demo abierta. Las ejecuciones tardan 1–2 minutos: se lanzan en directo y,
-  mientras corren, se explica el grafo o una ejecución anterior.
-- Si GitHub no responde: el recorrido tiene versión local real (pytest, Docker, `vigilancia.sh`)
-  y se dice abiertamente.
-- `gh auth status` con la cuenta dueña del repositorio como activa: `scripts/abrir-pr.sh` se
-  para si la cuenta activa solo puede leer (`gh auth switch` para cambiarla).
+- Estado de partida: `v1.0.0` en producción, ninguna PR ni incidencia abierta, todo en verde.
+- Si GitHub no responde: los bloques 1 y 2 son iguales en local (`comprobar.sh`) y se dice abiertamente.
 - Nada de credenciales, tokens ni el archivo `.env` en pantalla.
 
 ## Recorrido
@@ -33,35 +46,19 @@ pregunta para el grupo. La práctica posterior es **opcional** (aclaración de L
 | Hora | Min | Diapositivas | Qué se enseña en diapositiva | Qué se hace en vivo |
 |---|---:|---|---|---|
 | 18:30–18:33 | 3 | 1–2 | Objetivo; QR de **S17 (23/11)** | Responder al QR un minuto |
-| 18:33–18:39 | 6 | 3–5 | **Punto de partida:** qué es CI/CD (bucle código → construir → probar → publicar → desplegar → monitorizar; sin y con CI/CD); qué es monitorizar (cuatro señales doradas, señales propias de IA, ciclo de un incidente); seis casos de uso y las cinco métricas DORA | Preguntar cómo publican hoy y cuál de los seis casos les ha pasado |
-| 18:39–18:45 | 6 | 6–9 | Caso conductor: la API de S16 con garantías; CI y entrega continua en los workflows de la demo; entornos y configuración; la cadena commit → digest → release → `request_id` | Abrir el repositorio: `app.py`, `.github/workflows/`, `evaluacion/`, `scripts/` |
-| 18:45–19:05 | 20 | 10–19 | Anatomía de un workflow; **qué es una action** (action.yml, tipos, runners); los seis workflows; los seis checks de la PR; tests con dobles; **CodeRabbit** como revisor con IA (16); ruleset y acciones por SHA; **alternativas** (Cloudflare Workers Builds, GitLab, CodeBuild, VPS propio) con precios | **Dos PR con fallo**, un comando cada una: `abrir-pr.sh calidad` (Calidad en rojo, anotación de ruff en la línea) y `abrir-pr.sh tests` (Tests en rojo); merge bloqueado; esperar ≈3 min el comentario de CodeRabbit |
-| 19:05–19:17 | 12 | 20–24 | Construir una vez; etiqueta frente a digest; GHCR; variables y secretos; tokens del job; procedencia verificable (atestación SLSA firmada con Sigstore) | **PR de B** (`abrir-pr.sh verde`) en verde y merge; `Entrega · main` publica en GHCR; digest y `gh attestation verify` |
-| 19:17–19:34 | 17 | 25–31 | La entrega real del ensayo (25); staging y producción con aprobación; rolling y circuit breaker (ejemplo ECS); smoke contra la API; despliegue progresivo (rolling, blue/green, canary, lineal); **cómo se demuestra un despliegue sin corte** | `extras/despliegue_sin_corte.py` (7 s); staging en verde; **aprobar producción** de B (`v1.1.0`) |
-| 19:34–19:50 | 16 | 32–38 | Logging y monitoring; log estructurado (línea real de B); **APM** (cascada de spans, `trace_id` frente a `request_id`); demo 4 con la incidencia real; **error tracking** (eventos agrupados por huella); vigilancia, alerta y panel en Pages; rollback | **Vigilancia** → incidencia abierta → `request_id` → `KeyError`; panel; **rollback a v1.0.0** |
+| 18:33–18:39 | 6 | 3–5 | **Punto de partida:** qué es CI/CD, qué es monitorizar, seis casos de uso y las métricas DORA | Preguntar cómo publican hoy y cuál de los seis casos les ha pasado |
+| 18:39–18:45 | 6 | 6–9 | Caso conductor; CI y entrega continua en los workflows de la demo; entornos; la cadena commit → digest → release → `request_id` | Recorrer el repositorio y `comprobar.sh` en `main`: 6/6 en verde |
+| 18:45–19:05 | 20 | 10–19 | Workflow y action; los seis workflows; los seis checks; tests con dobles; **demo 1**; CodeRabbit (16); ruleset y SHA; alternativas con precios | **Demo 1:** rama correcta → `comprobar.sh` (6/6) → PR verde; rama incorrecta → `comprobar.sh` (Calidad y Tests) → PR roja y bloqueada; CodeRabbit en la roja |
+| 19:05–19:17 | 12 | 20–24 | Construir una vez; digest; GHCR; secretos; tokens del job; procedencia verificable | **Demo 2:** integrar la PR verde; `Entrega · main` publica; digest y `gh attestation verify` |
+| 19:17–19:34 | 17 | 25–31 | Entrega real (25); staging y producción con aprobación; rolling; smoke; progresivos; sin corte | `extras/despliegue_sin_corte.py`; **demo 3:** aprobar producción → `v1.1.0` |
+| 19:34–19:50 | 16 | 32–38 | Observabilidad; log estructurado; APM; **el fallo del ensayo** (35); error tracking; vigilancia, alerta y panel; rollback | **Demo 4:** vigilancia en verde y panel; **demo 5:** rollback a `v1.0.0` como simulacro y vuelta a `v1.1.0` |
 | 19:50–19:54 | 4 | 39–40 | Migraciones expand/contract; backups, RPO/RTO y restauración | `extras/migracion_y_restauracion.py` (30 s) |
-| 19:54–20:00 | 6 | 41–42 | Práctica opcional, evidencias que se piden y cierre | Preguntas; recordar el QR |
+| 19:54–20:00 | 6 | 41–42 | Práctica opcional y cierre | Preguntas; recordar el QR |
 
-**Redistribución del 23/11/2026** (demo nativa de GitHub; dos diapositivas nuevas: 16 CodeRabbit y
-25 la entrega real del ensayo): la 16 (2 min) sale de la demo 1 (15, de 4 a 3 min) y de precios
-(19, de 2 a 1 min); la 25 (2 min) sale de staging y producción (26) y del smoke (28), un minuto
-cada una. Ningún bloque cambia de duración. Los párrafos siguientes conservan la numeración de
-su fecha: desde la 16 todo sube un número y desde la 25, dos.
-
-**Redistribución del 17/11/2026** (tres diapositivas nuevas: 27 APM, 29 error tracking, 33 despliegue
-sin corte, 8 minutos): se recorta un minuto a 10 (comprobaciones de la PR), 17 (secretos), 21
-(desplegar), 22 (rolling), 25 (mapa de observabilidad), 32 (progresivos), 34 (migraciones) y 37
-(cierre). La franja exacta de cada diapositiva está al principio de sus notas.
-
-**Redistribución del 20/11/2026** (tres diapositivas de punto de partida al principio: 3 qué es CI/CD, 4 qué es
-monitorizar, 5 casos de uso; 6 minutos): se recorta un minuto al caso conductor (6), dos a «tres automatizaciones»
-(7, que ahora repasa lo visto en la 3), uno a entornos (8), uno a la cadena (9) y uno a la demo de desplegar B (27).
-Desde la 3, todas las diapositivas citadas antes del 20/11 suben tres números.
-
-**Revisión del 20/11/2026.** Progresivos y «sin corte, cómo se demuestra» pasan del bloque 6 al bloque 4, detrás de la
-verificación (ahora 27 y 28). Van antes de desplegar B (29), que debe seguir justo antes del bloque 5 porque el fallo de B
-se investiga en la demo 4. Observabilidad y rollback pasan a 30–36 (19:34–19:50); el bloque 6 queda en migraciones y
-backups (37–38). No cambia la duración de ninguna diapositiva; la 7 ahora sitúa CI y CD en los workflows de la demo.
+La franja exacta de cada diapositiva está al principio de sus notas. **Cambio del 23/11/2026
+(noche):** la demo pasa a dos ramas preparadas (correcta e incorrecta), con los checks primero en
+local y luego en la PR; la historia anterior de B (verde con un fallo escondido → incidencia →
+rollback → arreglo) queda como el ensayo real que enseñan las diapositivas 25, 31, 35, 37 y 38.
 
 ## Bloque a bloque
 
@@ -70,140 +67,118 @@ backups (37–38). No cambia la duración de ninguna diapositiva; la 7 ahora sit
 - El objetivo no es «tener un pipeline», sino **poder demostrar** tres cosas: un cambio
   defectuoso no llega a desplegarse, lo desplegado es exactamente lo que se probó y se puede
   volver a una versión conocida.
-- QR: evalúa la **S17 del 23/11** (Bedrock + Lambda). Un minuto para rellenarlo; Laura insiste
-  en que las respuestas son importantes.
+- QR: evalúa la **S17 del 23/11** (Bedrock + Lambda). Un minuto para rellenarlo.
 - El grupo L/X tuvo la S16 con otro profesor: la demo trae su propia API (la misma tarea de
-  clasificación de incidencias ficticias), no hace falta haber hecho la de José.
+  clasificación de incidencias ficticias).
 - **Pregunta:** «¿Qué tendría que pasar para que os fiarais de desplegar un viernes a las 19:00?».
 
 ### 18:33 · Punto de partida · qué es CI/CD y qué es monitorizar (3–5)
 
-- **3 · Qué es CI/CD.** Bucle infinito: a la izquierda CI (código, construir, probar), a la derecha CD
-  (publicar, desplegar) y la monitorización cerrando el círculo. Columna «sin CI/CD» frente a «con CI/CD»:
-  cada línea de «con» es una parte de la clase.
-- **4 · Qué es monitorizar.** Panel ilustrativo con las cuatro señales doradas (latencia, tráfico, errores,
-  saturación); señales propias de una app de IA (tokens, coste, latencia del modelo, calidad → S19); ciclo de
-  un incidente: detectar → avisar → diagnosticar → recuperar → aprender, que es lo que se hará en el bloque 5.
-- **5 · Casos de uso.** Seis situaciones típicas con «sin» y «con» (un cambio rompe la API, cambiar de modelo,
-  error de madrugada, volver atrás, factura de tokens, publicar a menudo) y las cinco métricas DORA.
+- **3 · Qué es CI/CD.** CI (código, construir, probar), CD (publicar, desplegar) y la
+  monitorización cerrando el círculo. Cada línea de «con CI/CD» es una parte de la clase.
+- **4 · Qué es monitorizar.** Las cuatro señales doradas, las señales propias de una app de IA y
+  el ciclo de un incidente (detectar → avisar → diagnosticar → recuperar → aprender).
+- **5 · Casos de uso** y las cinco métricas DORA.
 - **Preguntas:** «¿A cuál de las dos columnas se parece cómo publicáis hoy?» y «¿Cuál de los seis casos os ha pasado?».
 
 ### 18:39 · Caso conductor y bloque 1 · CI/CD y entornos (6–9)
 
-- CI = integrar a menudo y comprobar cada cambio automáticamente. CD tiene dos lecturas:
-  *entrega continua* (siempre hay un artefacto listo; desplegar es una decisión) y *despliegue
-  continuo* (se despliega solo). La demo hace **entrega continua**: producción exige aprobación.
+- CI = integrar a menudo y comprobar cada cambio. La demo hace **entrega continua**: siempre hay
+  una imagen validada y pasar a producción es una decisión (aprobación).
 - Entornos: local, CI, staging, producción. La **misma imagen** en todos; cambia la configuración.
-- La cadena que conecta todo: commit → comprobaciones → imagen → **digest** → release →
-  etiqueta `produccion` → cada petición lleva `version` = commit. Con ella se responde «¿qué
-  código atendió esta petición?».
+- La cadena: commit → comprobaciones → imagen → **digest** → release → etiqueta `produccion` →
+  cada petición lleva `version` = commit.
 - Honestidad: GitHub no aloja la API. Staging arranca la imagen en el runner y producción es la
   etiqueta `produccion` que ejecutaría el servidor. En AWS cambiarían esos dos jobs; el resto no.
-- **En vivo:** recorrer el repositorio (un archivo de app, tests, evaluación, seis workflows).
+- **En vivo:** recorrer el repositorio y lanzar `bash scripts/comprobar.sh` en `main`: los seis
+  checks de la PR, en local, en unos 10 s. Todo en verde: es el punto de partida.
 - **Pregunta:** «Si mañana falla una petición, ¿qué dato necesitáis para saber qué versión la atendió?».
 
 ### 18:45 · Bloque 2 · GitHub Actions (10–19)
 
-- Workflow, evento, job, step, runner, action, `permissions`. Un job no tiene más permisos de
-  los que declara: la PR solo tiene `contents: read`.
-- **Qué es una action (11):** un paso reutilizable que vive en su propio repositorio y se describe
-  con `action.yml`: `inputs`, `outputs` y `runs`. Tres tipos: JavaScript, contenedor y compuesta.
-  Runner de GitHub (máquina limpia; gratis e ilimitado en repositorios públicos) frente a runner propio.
-- Los seis checks de `comprobaciones.yml`, en paralelo: **Calidad** (lock, ruff), **Tests**
-  (cobertura ≥ 90 %), **Evaluación** (≥ 80 % de aciertos; enlaza con S19), **Imagen** (build y
-  smoke), **Dependencias** (dependency review y pip-audit) y **Workflows** (actionlint, zizmor,
-  shellcheck). CodeQL corre aparte y no es obligatorio. Lo llaman la PR y `main`.
-- Tests: el proveedor de IA se sustituye por un doble. Tres casos del enunciado: entrada
-  inválida (422), respuesta válida y fallo del proveedor (504 sin inventar respuesta).
-- **Demo · dos PR con fallo, un comando cada una** (`scripts/abrir-pr.sh`). `calidad` añade un
-  `import logging` que nadie usa: solo `ci / Calidad` en rojo y ruff lo anota en la línea del diff.
-  `tests` (`cambios/01`) «mejora» la API devolviendo una respuesta por defecto cuando el proveedor
-  falla. Parece razonable; dos tests lo detectan. El check Tests queda en rojo y la regla de
-  `main` bloquea el merge. Se lanzan seguidas y corren a la vez: cada check atrapa un tipo de
-  error distinto. Si va justo de tiempo, basta con `tests`.
-- **CodeRabbit (16):** app de revisión con IA instalada en la cuenta (check de terceros, no
-  obligatorio). En el ensayo, en unos tres minutos resumió la PR y comentó las líneas: acertó el
-  problema (dos tests rotos y un cliente que no sabe que el proveedor falló), pero propuso
-  «actualizar los tests al nuevo contrato», que dejaría pasar el fallo. Decide una persona; bloquea
-  el test. Dejar la PR abierta ≈3 min: si se cierra antes, CodeRabbit responde «Review failed: the
-  pull request is closed».
-- Acciones fijadas al SHA de 40 caracteres: un tag se puede mover; un SHA no. `zizmor` lo comprueba
-  en cada PR y Dependabot propone las actualizaciones (con una semana de espera).
-- **Alternativas (18–19):** Cloudflare Workers Builds, GitLab CI/CD, AWS CodeBuild + CodePipeline
-  y un VPS propio. Mensaje: cambia quién mantiene la máquina; las garantías de la clase no.
-- **Pregunta:** «¿Por qué el fallo lo detecta un test y no el build de Docker?».
-- **Pregunta (alternativas):** «¿Por qué el VPS, que parece el más barato, no es siempre la mejor opción?».
+- Workflow, evento, job, step, runner, action, `permissions`. La PR solo tiene `contents: read`.
+- **Qué es una action (11):** `action.yml` con `inputs`, `outputs` y `runs`; tres tipos; runner
+  de GitHub frente a runner propio.
+- **Los seis checks (12–13):** Calidad, Tests, Evaluación, Imagen, Dependencias y Workflows, en
+  paralelo. `scripts/comprobar.sh` ejecuta los mismos en local. CodeQL corre aparte.
+- **Tests con dobles (14):** el proveedor de IA se sustituye por un doble; entrada inválida (422),
+  respuesta válida y fallo del proveedor (504 sin inventar respuesta).
+- **Demo 1 (15) · el mismo camino para un cambio correcto y otro incorrecto.**
+  1. `git switch plazo-de-atencion` y enseñar el diff: `SLA_HORAS` con las tres prioridades y un
+     test para cada una. `bash scripts/comprobar.sh` → **6/6 en verde, 41 passed**.
+     `bash scripts/abrir-pr.sh correcto` → la PR, y en unos 25 s los seis checks en verde y el
+     merge permitido. Mensaje: GitHub ha hecho exactamente lo mismo que el portátil, en una
+     máquina limpia. No se integra todavía (bloque 3).
+  2. `git switch respuesta-por-defecto` y enseñar el diff: si el proveedor falla, una respuesta
+     por defecto (parece amable) y un `import logging` que se quedó sin usar.
+     `bash scripts/comprobar.sh` → **Calidad y Tests en rojo**, con la causa debajo: la línea del
+     import (F401) y los dos tests que esperan un 504 sin respuesta inventada.
+     `bash scripts/abrir-pr.sh incorrecto` → los mismos dos checks en rojo en la PR, la anotación de
+     ruff en la línea del diff y el merge **bloqueado** por la regla de `main`.
+  3. Moraleja: el build y el arranque funcionan en los dos casos; lo que separa uno de otro son
+     los tests y el análisis. Cada check atrapa un tipo de error distinto.
+- **CodeRabbit (16):** comenta la PR roja a los ≈3 min (no cerrarla antes). En el ensayo acertó el
+  problema, pero propuso «actualizar los tests al nuevo contrato», que dejaría pasar el fallo.
+  Decide una persona; lo que bloquea es el test. Después: `bash scripts/abrir-pr.sh cerrar incorrecto`.
+- **Ruleset y acciones por SHA (17):** un tag se puede mover; un SHA no.
+- **Alternativas (18–19):** cambia quién mantiene la máquina; las garantías de la clase no.
+- **Preguntas:** «¿Por qué el fallo lo detecta un test y no el build de Docker?» y «¿Por qué el
+  VPS, que parece el más barato, no es siempre la mejor opción?».
 
 ### 19:05 · Bloque 3 · Artefacto, secretos y procedencia (20–24)
 
-- Construir **una vez**. Una etiqueta es un nombre que puede apuntar a otra imagen; el digest es
-  la huella del contenido. Staging, producción y el rollback usan el digest.
-- Dónde vive cada dato: `.env` local (fuera de Git), variables y secretos de GitHub (el único
-  secreto opcional es `OPENROUTER_API_KEY`, para evaluar el modelo real). En la imagen, nada secreto.
-- **Sin claves guardadas:** cada job recibe un token temporal de GitHub con los permisos que
-  declara (`packages: write` para publicar). La atestación se firma con un token OIDC de corta
-  duración: es el mismo mecanismo que usaría AWS para dar credenciales de una hora a un rol.
-- **Demo:** PR de B (`cambios/02`) con los seis checks en verde → merge → `Entrega · main` publica
-  la imagen en GHCR; en el resumen, el digest. `gh attestation verify` demuestra quién la construyó
-  y desde qué commit.
-- **Ojo con CodeRabbit en la PR de B.** Si se espera ≈3 min, comenta que a `SLA_HORAS` le falta
-  `baja` y que eso daría un 500 (ensayo del 23/11, PR #11). Dos opciones: integrar en cuanto los
-  seis checks estén en verde (CodeRabbit no llega: al cerrarse la PR responde «Review failed») o
-  esperar y enseñarlo. Si se enseña: el revisor lo vio, pero un comentario no bloquea; sin un test
-  que lo describa, B llega a producción. La versión C convierte ese aviso en un test.
+- Construir **una vez**. Una etiqueta se puede mover; el digest es la huella del contenido.
+  Staging, producción y el rollback usan el digest.
+- Dónde vive cada dato: `.env` local, secretos de GitHub (solo `OPENROUTER_API_KEY`, opcional);
+  en la imagen, nada secreto.
+- **Sin claves guardadas:** cada job recibe un token temporal con los permisos que declara; la
+  atestación se firma con un token OIDC de corta duración.
+- **Demo 2 (24):** integrar la PR verde (`gh pr merge plazo-de-atencion --squash --delete-branch`).
+  `Entrega · main` repite los checks, publica la imagen en GHCR y anota el digest;
+  `gh attestation verify` demuestra quién la construyó y desde qué commit.
 - **Pregunta:** «¿Qué ganamos al desplegar por digest en lugar de por la etiqueta `latest`?».
 
 ### 19:17 · Bloque 4 · Staging, producción y despliegue sin corte (25–31)
 
-- **La entrega real (25):** captura del grafo de la ejecución de B en el ensayo (seis checks →
-  publicar → staging → producción → panel, ≈2 min y medio). Se enseña mientras corre la de clase.
-
-- **Staging:** el job descarga exactamente el digest publicado, lo arranca endurecido
-  (`--read-only`, `--cap-drop ALL`) y pasa el smoke con la versión esperada. Un job verde no
-  basta: la API tiene que responder y ser la versión correcta.
+- **La entrega real del ensayo (25):** el grafo de una ejecución completa (≈2 min y medio). Se
+  enseña mientras corre la de clase.
+- **Staging (26):** el job descarga el digest publicado, lo arranca endurecido y pasa el smoke
+  con la versión esperada. Un job verde no basta: la API tiene que responder.
 - **Producción:** el environment `produccion` exige aprobación. Al aprobar, la etiqueta
-  `produccion` pasa a señalar el mismo digest (se comprueba) y se crea la release `v1.1.0` con
-  las notas generadas. El historial queda en **Environments**.
-- **Progresivos (29):** rolling, blue/green, canary, lineal. Necesitan algo que reparta el tráfico
-  (balanceador, Service Connect, porcentajes de versiones); la demo no despliega en un servidor.
-- **Sin corte, cómo se demuestra (30):** endpoint estable, readiness y drenaje; cero fallos antes,
-  durante y después. En vivo, `uv run python extras/despliegue_sin_corte.py`: sin corte 0 fallos;
-  parar y arrancar ≈60 fallos.
-- **Demo (31):** aprobar producción de B y abrir la release y el panel.
-- **Pregunta:** «¿Qué diferencia hay entre "el job está en verde" y "producción ejecuta B"?».
+  `produccion` pasa a ese digest (se comprueba) y se crea la release `v1.1.0`.
+- **Progresivos (29)** y **sin corte (30):** en vivo `uv run python extras/despliegue_sin_corte.py`
+  (sin corte 0 fallos; parar y arrancar ≈60).
+- **Demo 3 (31):** aprobar producción en **Review deployments** y abrir la release y el panel.
+- **Pregunta:** «¿Qué diferencia hay entre "el job está en verde" y "producción ejecuta la v1.1.0"?».
 
 ### 19:34 · Bloque 5 · Observabilidad y rollback (32–38)
 
-- Cuatro herramientas para cuatro preguntas: logging (qué pasó en una petición), monitoring
-  (cómo va el servicio), APM/trazas (dónde se va el tiempo) y error tracking (agrupar
-  excepciones y avisar). La demo implementa logs, vigilancia sintética, alerta (incidencia) y
-  panel; APM y error tracking se explican, **no se integran**.
-- Log estructurado: una línea JSON con `request_id`, `version`, `ruta`, `estado`, `duracion_ms`,
-  `proveedor_ms`. Nunca el texto del usuario ni secretos.
-- **APM (34)** y **error tracking (36):** esquemas rotulados como ilustrativos; ni OpenTelemetry
-  ni Sentry están integrados.
-- **Demo · el fallo que los tests no cubrían (35).** Se lanza `Vigilancia · producción`: tres
-  peticiones, una por prioridad. B responde 500 a la de prioridad baja. El workflow queda en rojo
-  y **abre una incidencia** con la versión, el digest, el `request_id` y la línea `excepcion` con
-  `KeyError`. El panel la muestra. ¿Por qué no lo vio staging? Su smoke solo prueba un caso.
-- **Vigilancia, alerta y panel (37):** captura real del panel del ensayo; la alerta es la incidencia.
-- **Rollback (38):** `Rollback · producción` con `v1.0.0`, aprobado. Sin reconstruir: prueba esa imagen
-  y le devuelve la etiqueta. Se repite la vigilancia: verde, y la incidencia se cierra sola.
-  Después, arreglar hacia delante con `cambios/03` (el test que faltaba, primero en rojo).
+- Cuatro herramientas para cuatro preguntas: logging, monitoring, APM/trazas y error tracking.
+  La demo implementa logs, vigilancia sintética, alerta (incidencia) y panel; APM y error
+  tracking se explican, **no se integran**.
+- Log estructurado (33): una línea JSON con `request_id`, `version`, `estado`, `duracion_ms`…
+- **El fallo del ensayo (35):** no se repite en directo. En el ensayo, una versión con los seis
+  checks en verde fallaba con la prioridad baja (500); la vigilancia lo encontró y **abrió la
+  incidencia sola**, con la versión, el digest, el `request_id` y la línea `KeyError`. Es lo que
+  pasa cuando un fallo no tiene test: hoy, el cambio correcto trae un test por prioridad.
+- **Demo 4 (37):** lanzar `Vigilancia · producción` contra la `v1.1.0`: tres peticiones, una por
+  prioridad, todas 200; ninguna incidencia; el panel con la versión nueva.
+- **Demo 5 (38) · rollback como simulacro:** `Rollback · producción` con `v1.0.0`, aprobado. Sin
+  reconstruir: prueba esa imagen y le devuelve la etiqueta. Vigilancia en verde con `v1.0.0` y
+  vuelta a `v1.1.0` con el mismo workflow. Los equipos ensayan el rollback antes de necesitarlo.
 - **Pregunta:** «¿El rollback arregla el código?».
 
 ### 19:50 · Bloque 6 · Datos y recuperación (39–40)
 
-- Expand → migrar → contract. Durante un despliegue y un rollback conviven dos versiones: el
-  esquema debe valer para las dos. **Volver a una imagen antigua no revierte los datos.**
+- Expand → migrar → contract. **Volver a una imagen antigua no revierte los datos.**
 - Backups: RPO y RTO; una copia solo vale si se ha restaurado. `extras/` lo demuestra con SQLite.
-- **Pregunta:** «Si B escribió datos en una columna nueva y volvemos a A, ¿qué pasa con ellos?».
+- **Pregunta:** «Si la versión nueva escribió datos en una columna nueva y volvemos a la anterior, ¿qué pasa con ellos?».
 
 ### 19:54 · Práctica y cierre (41–42)
 
-- Práctica opcional: [ejercicio.md](ejercicio.md), gratuita en un repositorio público.
-  Evidencias: PR roja, digest y atestación, aprobación de producción, incidencia de la
-  vigilancia y rollback.
+- Práctica opcional: [ejercicio.md](ejercicio.md), gratuita en un repositorio público. Evidencias:
+  una PR verde y otra roja bloqueada, digest y atestación, aprobación de producción, vigilancia y
+  rollback.
 - Recordar el QR de S17. Próxima sesión: S19, evaluación y testing de sistemas de IA.
 
 ## Si algo falla en directo
@@ -211,7 +186,8 @@ backups (37–38). No cambia la duración de ninguna diapositiva; la 7 ahora sit
 | Situación | Qué hacer |
 |---|---|
 | Un workflow tarda más de 2 minutos | Explicar el grafo o una ejecución anterior; volver al final del bloque |
-| GitHub no responde (githubstatus.com) | Recorrido local equivalente (comandos.md) y decirlo |
-| Un check falla sin motivo aparente | Es la demo de que «un job verde no basta»: leer el log, no forzarlo; **Re-run failed jobs** |
+| GitHub no responde (githubstatus.com) | `comprobar.sh` en las dos ramas (mismos checks) y la imagen de respaldo; decirlo |
+| `abrir-pr.sh` dice que la cuenta no puede escribir | `gh auth switch --user JoseAntonioNuevo` |
+| Un check falla sin motivo aparente | Leer el log, no forzarlo; **Re-run failed jobs** |
 | Producción no pide aprobación | Revisar **Settings → Environments → produccion → Required reviewers** |
 | Pregunta fuera de alcance (Kubernetes, Terraform…) | Responder en una frase y apuntarla para el cierre |
