@@ -33,8 +33,8 @@ pregunta para el grupo. La práctica posterior es **opcional** (aclaración de L
 | 18:30–18:33 | 3 | 1–2 | Objetivo; QR de **S17 (23/11)** | Responder al QR un minuto |
 | 18:33–18:39 | 6 | 3–5 | **Punto de partida:** qué es CI/CD (bucle código → construir → probar → publicar → desplegar → monitorizar; sin y con CI/CD); qué es monitorizar (cuatro señales doradas, señales propias de IA, ciclo de un incidente); seis casos de uso y las cinco métricas DORA | Preguntar cómo publican hoy y cuál de los seis casos les ha pasado |
 | 18:39–18:45 | 6 | 6–9 | Caso conductor: la API de S16 con garantías; CI y entrega continua en los workflows de la demo; entornos y configuración; la cadena commit → digest → release → `request_id` | Abrir el repositorio: `app.py`, `.github/workflows/`, `evaluacion/`, `scripts/` |
-| 18:45–19:05 | 20 | 10–19 | Anatomía de un workflow; **qué es una action** (action.yml, tipos, runners); los seis workflows; los seis checks de la PR; tests con dobles; **CodeRabbit** como revisor con IA (16); ruleset y acciones por SHA; **alternativas** (Cloudflare Workers Builds, GitLab, CodeBuild, VPS propio) con precios | **PR con fallo**: aplicar `cambios/01`, ver los seis checks en paralelo, Tests en rojo y la PR bloqueada; esperar ≈3 min el comentario de CodeRabbit |
-| 19:05–19:17 | 12 | 20–24 | Construir una vez; etiqueta frente a digest; GHCR; variables y secretos; tokens del job; procedencia verificable (atestación SLSA firmada con Sigstore) | **PR de B** en verde y merge; `Entrega · main` publica en GHCR; digest y `gh attestation verify` |
+| 18:45–19:05 | 20 | 10–19 | Anatomía de un workflow; **qué es una action** (action.yml, tipos, runners); los seis workflows; los seis checks de la PR; tests con dobles; **CodeRabbit** como revisor con IA (16); ruleset y acciones por SHA; **alternativas** (Cloudflare Workers Builds, GitLab, CodeBuild, VPS propio) con precios | **Dos PR con fallo**, un comando cada una: `abrir-pr.sh calidad` (Calidad en rojo, anotación de ruff en la línea) y `abrir-pr.sh tests` (Tests en rojo); merge bloqueado; esperar ≈3 min el comentario de CodeRabbit |
+| 19:05–19:17 | 12 | 20–24 | Construir una vez; etiqueta frente a digest; GHCR; variables y secretos; tokens del job; procedencia verificable (atestación SLSA firmada con Sigstore) | **PR de B** (`abrir-pr.sh verde`) en verde y merge; `Entrega · main` publica en GHCR; digest y `gh attestation verify` |
 | 19:17–19:34 | 17 | 25–31 | La entrega real del ensayo (25); staging y producción con aprobación; rolling y circuit breaker (ejemplo ECS); smoke contra la API; despliegue progresivo (rolling, blue/green, canary, lineal); **cómo se demuestra un despliegue sin corte** | `extras/despliegue_sin_corte.py` (7 s); staging en verde; **aprobar producción** de B (`v1.1.0`) |
 | 19:34–19:50 | 16 | 32–38 | Logging y monitoring; log estructurado (línea real de B); **APM** (cascada de spans, `trace_id` frente a `request_id`); demo 4 con la incidencia real; **error tracking** (eventos agrupados por huella); vigilancia, alerta y panel en Pages; rollback | **Vigilancia** → incidencia abierta → `request_id` → `KeyError`; panel; **rollback a v1.0.0** |
 | 19:50–19:54 | 4 | 39–40 | Migraciones expand/contract; backups, RPO/RTO y restauración | `extras/migracion_y_restauracion.py` (30 s) |
@@ -113,9 +113,12 @@ backups (37–38). No cambia la duración de ninguna diapositiva; la 7 ahora sit
   shellcheck). CodeQL corre aparte y no es obligatorio. Lo llaman la PR y `main`.
 - Tests: el proveedor de IA se sustituye por un doble. Tres casos del enunciado: entrada
   inválida (422), respuesta válida y fallo del proveedor (504 sin inventar respuesta).
-- **Demo · PR con fallo.** `cambios/01` «mejora» la API devolviendo una respuesta por defecto
-  cuando el proveedor falla. Parece razonable; dos tests lo detectan. El check Tests queda en
-  rojo y la regla de `main` bloquea el merge.
+- **Demo · dos PR con fallo, un comando cada una** (`scripts/abrir-pr.sh`). `calidad` añade un
+  `import logging` que nadie usa: solo `ci / Calidad` en rojo y ruff lo anota en la línea del diff.
+  `tests` (`cambios/01`) «mejora» la API devolviendo una respuesta por defecto cuando el proveedor
+  falla. Parece razonable; dos tests lo detectan. El check Tests queda en rojo y la regla de
+  `main` bloquea el merge. Se lanzan seguidas y corren a la vez: cada check atrapa un tipo de
+  error distinto. Si va justo de tiempo, basta con `tests`.
 - **CodeRabbit (16):** app de revisión con IA instalada en la cuenta (check de terceros, no
   obligatorio). En el ensayo, en unos tres minutos resumió la PR y comentó las líneas: acertó el
   problema (dos tests rotos y un cliente que no sabe que el proveedor falló), pero propuso

@@ -55,19 +55,23 @@ uv run pytest -q --cov                 # 38 passed, cobertura ≈96 %
 uv run python -m evaluacion.evaluar    # 11/12 (91,7 %) · umbral 80 %
 ```
 
-## Bloque 2 · Demo: una PR con un fallo queda bloqueada (≈30 s de checks; CodeQL ≈1 min)
+## Bloque 2 · Demo: dos PR con un fallo quedan bloqueadas (≈30 s de checks; CodeQL ≈1 min)
+
+Un comando por PR (`scripts/abrir-pr.sh`: rama, parche, commit, push, PR y navegador). Se lanzan
+seguidas y corren a la vez:
 
 ```bash
-git switch -c respuesta-por-defecto
-git apply cambios/01-pr-con-fallo.patch
-git commit -qam "Responder algo por defecto si falla el proveedor"
-git push -u origin HEAD
-gh pr create --fill
-gh pr checks --watch --required        # ci / Tests en rojo; el resto en verde
-gh pr view --json mergeStateStatus     # BLOCKED
+bash scripts/abrir-pr.sh calidad       # import sin usar → solo ci / Calidad en rojo
+bash scripts/abrir-pr.sh tests         # respuesta inventada → solo ci / Tests en rojo
+gh pr checks respuesta-por-defecto --watch --required
+gh pr view respuesta-por-defecto --json mergeStateStatus   # BLOCKED
 # esperar ≈3 min al comentario de CodeRabbit (diapositiva 16) antes de cerrar
-gh pr close --delete-branch && git switch main
+bash scripts/abrir-pr.sh cerrar        # cierra las dos y borra sus ramas
 ```
+
+En la de **calidad**, **Files changed** muestra la anotación de ruff (`F401 logging imported but
+unused`) en la línea del import. Si GitHub no responde: `SOLO_LOCAL=1 bash scripts/abrir-pr.sh tests`
+hace lo mismo en local y enseña `2 failed` (con `calidad`, «ruff: FALLA»).
 
 En la PR: los seis checks en paralelo, el botón de merge bloqueado y, en **Files changed**, las
 anotaciones de CodeQL si las hay. También aparecen GitGuardian y CodeRabbit: son apps instaladas
@@ -81,11 +85,9 @@ tras revertir, todo verde y merge `CLEAN`.
 ## Bloque 3 · Demo: la versión B pasa todo y se publica
 
 ```bash
-git switch -c plazo-de-atencion
-git apply cambios/02-version-b.patch
-git commit -qam "Añadir el plazo de atención (versión B)"
-git push -u origin HEAD && gh pr create --fill && gh pr checks --watch --required   # todo verde
-gh pr merge --squash --delete-branch && git switch main && git pull --ff-only
+bash scripts/abrir-pr.sh verde                                       # la versión B
+gh pr checks plazo-de-atencion --watch --required                    # los seis en verde
+gh pr merge plazo-de-atencion --squash --delete-branch && git pull --ff-only
 gh run watch "$(ultima entrega-main.yml)"
 ```
 
@@ -151,11 +153,8 @@ gh issue list --label incidente --state closed --limit 1   # cerrada con «Recup
 Arreglar hacia delante (el test que faltaba, primero en rojo):
 
 ```bash
-git switch -c plazo-para-todas-las-prioridades
-git apply --include='tests/*' cambios/03-test-que-faltaba.patch && uv run pytest -q   # 1 failed
-git apply --exclude='tests/*' cambios/03-test-que-faltaba.patch && uv run pytest -q   # todo verde
-git commit -qam "Plazo de atención para todas las prioridades" && git push -u origin HEAD
-gh pr create --fill && gh pr checks --watch --required
+bash scripts/abrir-pr.sh arreglo       # en local: «1 failed» con el test y «42 passed» con el arreglo; abre la PR
+gh pr checks plazo-para-todas-las-prioridades --watch --required
 ```
 
 Si da tiempo: integrar, aprobar `v1.2.0` y lanzar la vigilancia (verde).
@@ -172,5 +171,5 @@ Producción debe volver a A con un rollback (no reescribiendo la historia):
 
 ```bash
 gh workflow run rollback.yml -f version=v1.0.0     # si quedó B en producción
-gh pr list --state open                            # cerrar las PR de la demo que sigan abiertas
+bash scripts/abrir-pr.sh cerrar                    # cierra las PR de la demo que sigan abiertas
 ```
