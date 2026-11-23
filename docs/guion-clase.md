@@ -24,6 +24,8 @@ pregunta para el grupo. La práctica posterior es **opcional** (aclaración de L
   mientras corren, se explica el grafo o una ejecución anterior.
 - Si GitHub no responde: el recorrido tiene versión local real (pytest, Docker, `vigilancia.sh`)
   y se dice abiertamente.
+- `gh auth status` con la cuenta dueña del repositorio como activa: `scripts/abrir-pr.sh` se
+  para si la cuenta activa solo puede leer (`gh auth switch` para cambiarla).
 - Nada de credenciales, tokens ni el archivo `.env` en pantalla.
 
 ## Recorrido
@@ -144,6 +146,11 @@ backups (37–38). No cambia la duración de ninguna diapositiva; la 7 ahora sit
 - **Demo:** PR de B (`cambios/02`) con los seis checks en verde → merge → `Entrega · main` publica
   la imagen en GHCR; en el resumen, el digest. `gh attestation verify` demuestra quién la construyó
   y desde qué commit.
+- **Ojo con CodeRabbit en la PR de B.** Si se espera ≈3 min, comenta que a `SLA_HORAS` le falta
+  `baja` y que eso daría un 500 (ensayo del 23/11, PR #11). Dos opciones: integrar en cuanto los
+  seis checks estén en verde (CodeRabbit no llega: al cerrarse la PR responde «Review failed») o
+  esperar y enseñarlo. Si se enseña: el revisor lo vio, pero un comentario no bloquea; sin un test
+  que lo describa, B llega a producción. La versión C convierte ese aviso en un test.
 - **Pregunta:** «¿Qué ganamos al desplegar por digest en lugar de por la etiqueta `latest`?».
 
 ### 19:17 · Bloque 4 · Staging, producción y despliegue sin corte (25–31)
