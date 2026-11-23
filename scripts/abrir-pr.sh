@@ -140,6 +140,14 @@ url="$(gh pr create --base main --head "$rama" --title "$titulo" \
     --body "$cuerpo"$'\n\n'"_Parche de la demo de S18: \`$parche\`._")"
 git switch -q main
 
+# GitHub tarda unos segundos en registrar los checks; hasta entonces «gh pr checks --watch» termina
+# con «no checks reported». Se espera aquí (como mucho 40 s) para que el seguimiento funcione siempre.
+for _ in $(seq 1 20); do
+    checks="$(gh pr checks "$url" --required --json name --jq length 2>/dev/null || echo 0)"
+    [[ "${checks:-0}" -gt 0 ]] && break
+    sleep 2
+done
+
 echo "✓ PR abierta: $url"
 echo "  Se espera: $esperado."
 echo "  Seguir los checks: gh pr checks $url --watch --required"
