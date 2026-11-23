@@ -65,14 +65,17 @@ git push -u origin HEAD
 gh pr create --fill
 gh pr checks --watch --required        # ci / Tests en rojo; el resto en verde
 gh pr view --json mergeStateStatus     # BLOCKED
+# esperar ≈3 min al comentario de CodeRabbit (diapositiva 16) antes de cerrar
 gh pr close --delete-branch && git switch main
 ```
 
 En la PR: los seis checks en paralelo, el botón de merge bloqueado y, en **Files changed**, las
 anotaciones de CodeQL si las hay. También aparecen GitGuardian y CodeRabbit: son apps instaladas
-en la cuenta, no workflows del repositorio (checks de terceros). Local: `uv run pytest -q` → `2 failed`.
+en la cuenta, no workflows del repositorio (checks de terceros). CodeRabbit tarda unos tres minutos;
+si la PR se cierra antes, deja «Review failed: the pull request is closed». Local: `uv run pytest -q` → `2 failed`.
 
-Ensayado el 23/11/2026 (PR #2): `ci / Tests` en rojo con `2 failed, 34 passed`, merge `BLOCKED`;
+Ensayado el 23/11/2026 (PR #1 del repositorio gemelo, con el `main` actual): `ci / Tests` en rojo con
+`2 failed, 36 passed`, merge `BLOCKED`;
 tras revertir, todo verde y merge `CLEAN`.
 
 ## Bloque 3 · Demo: la versión B pasa todo y se publica
