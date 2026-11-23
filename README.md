@@ -33,7 +33,8 @@ releases, atestaciones, CodeQL, Dependabot y GitHub Pages.
 | `scripts/smoke.sh` | Comprobación tras desplegar: salud, versión, una clasificación y un 422 |
 | `scripts/vigilancia.sh` | Vigilancia sintética: tres peticiones, una por prioridad |
 | `scripts/panel.py` | Genera el panel de producción que publica GitHub Pages |
-| `cambios/` | Tres parches para la clase: PR con fallo, versión B y el test que faltaba |
+| `cambios/` | Cuatro parches para la clase: un import sin usar, PR con fallo, versión B y el test que faltaba |
+| `scripts/abrir-pr.sh` | Abre cada PR de la demo con un comando: `calidad`, `tests`, `verde`, `arreglo` y `cerrar` |
 | `extras/` | Despliegue sin corte en local, migración compatible y prueba de restauración |
 | `docs/` | Guion de clase, comandos en orden y práctica opcional |
 
@@ -172,7 +173,21 @@ status checks to pass* con `ci / Calidad`, `ci / Tests`, `ci / Evaluación`, `ci
 
 ## 3. El recorrido de la clase
 
-### 3.1 Una PR con un fallo queda bloqueada
+Cada PR de la demo se abre con un comando, desde `main` limpio y al día. `bash scripts/abrir-pr.sh`
+crea la rama, aplica el parche de `cambios/`, hace el commit, la sube y abre la PR; con
+`SOLO_LOCAL=1` lo hace todo en local y enseña lo que dirían ruff y pytest, sin tocar GitHub.
+Debajo de cada apartado están los pasos a mano, por si quieres verlos.
+
+### 3.1 Dos PR con un fallo quedan bloqueadas
+
+```bash
+bash scripts/abrir-pr.sh calidad   # un import sin usar: solo ci / Calidad en rojo
+bash scripts/abrir-pr.sh tests     # una respuesta inventada: solo ci / Tests en rojo
+```
+
+Cada check atrapa un tipo de error distinto: ruff marca el import en la misma línea del diff
+(**Files changed**) y los tests detectan un cambio de comportamiento que compila y arranca. A mano,
+la segunda:
 
 ```bash
 git switch -c respuesta-por-defecto
@@ -182,10 +197,17 @@ git push -u origin HEAD && gh pr create --fill && gh pr checks --watch --require
 ```
 
 El cambio parece razonable, pero inventa una respuesta cuando el proveedor falla. Dos tests lo
-detectan, el check **Tests** queda en rojo y la PR no se puede integrar. Ciérrala:
-`gh pr close --delete-branch`.
+detectan, el check **Tests** queda en rojo y la PR no se puede integrar. Ciérralas:
+`bash scripts/abrir-pr.sh cerrar` (o `gh pr close --delete-branch` en cada una).
 
 ### 3.2 La versión B pasa todo y llega a producción
+
+```bash
+bash scripts/abrir-pr.sh verde     # los seis checks en verde
+gh pr merge plazo-de-atencion --squash --delete-branch && git pull --ff-only
+```
+
+A mano:
 
 ```bash
 git switch main && git switch -c plazo-de-atencion
@@ -226,6 +248,12 @@ Apruébalo (también es producción). El workflow prueba la imagen de `v1.0.0` y
 etiqueta `produccion`. Lanza otra vez la vigilancia: en verde, y cierra la incidencia sola.
 
 ### 3.5 Arreglar hacia delante
+
+```bash
+bash scripts/abrir-pr.sh arreglo   # en local: el test nuevo en rojo, el arreglo en verde; abre la PR
+```
+
+A mano:
 
 ```bash
 git switch -c plazo-para-todas-las-prioridades
