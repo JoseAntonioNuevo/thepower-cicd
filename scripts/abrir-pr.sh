@@ -1,22 +1,18 @@
 #!/usr/bin/env bash
-# Abre una de las PR de la demo con un solo comando, partiendo de un main limpio y al día.
+# Las dos PR de la demo: un cambio correcto y otro incorrecto, cada uno en su rama.
 #
-#   bash scripts/abrir-pr.sh calidad   # ci / Calidad en rojo: un import sin usar (ruff F401)
-#   bash scripts/abrir-pr.sh tests     # ci / Tests en rojo: inventa una respuesta si falla el proveedor
-#   bash scripts/abrir-pr.sh verde     # los seis checks en verde: la versión B
-#   bash scripts/abrir-pr.sh arreglo   # el test que faltaba (1 failed en local) y el arreglo; requiere B en main
-#   bash scripts/abrir-pr.sh cerrar    # cierra las PR de la demo que sigan abiertas y borra sus ramas
+#   bash scripts/abrir-pr.sh preparar     # antes de clase: crea y sube las dos ramas desde main
+#   bash scripts/abrir-pr.sh correcto     # PR de plazo-de-atencion: los seis checks en verde
+#   bash scripts/abrir-pr.sh incorrecto   # PR de respuesta-por-defecto: Calidad y Tests en rojo
+#   bash scripts/abrir-pr.sh cerrar       # cierra las PR de la demo abiertas (las ramas se quedan)
+#   bash scripts/abrir-pr.sh cerrar incorrecto   # solo la del cambio incorrecto
 #
-# Variables opcionales:
-#   SIN_NAVEGADOR=1  no abre la PR en el navegador al crearla.
-#   SOLO_LOCAL=1     no sube nada a GitHub: crea la rama, aplica el parche, hace el commit, muestra
-#                    lo que dirían ruff y pytest y vuelve a main (ensayo o respaldo si GitHub falla).
+# En clase, para cada rama: git switch <rama> → bash scripts/comprobar.sh → abrir su PR.
+# Con SIN_NAVEGADOR=1 no abre la PR en el navegador.
 set -euo pipefail
 
-RAMAS=(import-sin-usar respuesta-por-defecto plazo-de-atencion plazo-para-todas-las-prioridades)
-
 uso() {
-    sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'
     exit 2
 }
 
@@ -25,132 +21,130 @@ fallo() {
     exit 1
 }
 
-resumen_pytest() {
-    # La última línea de pytest («N passed» o «N failed, M passed»), sin cortar el script si falla.
-    uv run --locked pytest -q -p no:cacheprovider 2>&1 | tail -n 1 || true
+# datos CAMBIO → rama, parche, título y descripción de la PR
+datos() {
+    case "$1" in
+        correcto)
+            rama=plazo-de-atencion
+            parche=cambios/cambio-correcto.patch
+            titulo="Añadir el plazo de atención a cada respuesta"
+            cuerpo="Cada respuesta incluye \`sla_horas\`, el plazo de atención según la prioridad (alta 4 h, media 24 h, baja 72 h), con un test para cada prioridad."
+            esperado="los seis checks en verde y el merge permitido"
+            ;;
+        incorrecto)
+            rama=respuesta-por-defecto
+            parche=cambios/cambio-incorrecto.patch
+            titulo="Responder algo por defecto si falla el proveedor"
+            cuerpo="Si el proveedor de IA no responde, devolvemos una clasificación por defecto en lugar de un error, para no dejar al usuario sin respuesta."
+            esperado="ci / Calidad (import sin usar) y ci / Tests (2 failed) en rojo y el merge bloqueado"
+            ;;
+        *) uso ;;
+    esac
 }
 
-cerrar() {
-    git switch -q main
-    local rama numero cerradas=0
-    for rama in "${RAMAS[@]}"; do
-        numero="$(gh pr list --head "$rama" --state open --json number --jq '.[0].number // empty')"
-        if [[ -n "$numero" ]]; then
-            gh pr close "$numero" --delete-branch
-            cerradas=$((cerradas + 1))
-        fi
-        if git show-ref --verify --quiet "refs/heads/$rama"; then
-            git branch -q -D "$rama"
-        fi
-    done
-    echo "✓ PR de la demo cerradas: $cerradas. Estás en main."
-}
-
-[[ $# -eq 1 ]] || uso
-cd "$(git rev-parse --show-toplevel)"
-command -v gh >/dev/null || fallo "Falta la CLI de GitHub (gh)."
-
-case "$1" in
-    calidad)
-        parche=cambios/00-import-sin-usar.patch
-        rama=import-sin-usar
-        titulo="Preparar el registro con el módulo logging"
-        cuerpo="Importa \`logging\` para llevar más adelante el log estructurado al módulo estándar."
-        esperado="solo ci / Calidad en rojo; la anotación de ruff sale en la línea del import"
-        ;;
-    tests)
-        parche=cambios/01-pr-con-fallo.patch
-        rama=respuesta-por-defecto
-        titulo="Responder algo por defecto si falla el proveedor"
-        cuerpo="Si el proveedor de IA no responde, devolvemos una clasificación por defecto en lugar de un error, para no dejar al usuario sin respuesta."
-        esperado="solo ci / Tests en rojo (2 failed) y el merge bloqueado"
-        ;;
-    verde)
-        parche=cambios/02-version-b.patch
-        rama=plazo-de-atencion
-        titulo="Añadir el plazo de atención (versión B)"
-        cuerpo="Cada respuesta incluye \`sla_horas\`, el plazo de atención según la prioridad, con su test."
-        esperado="los seis checks en verde; al integrarla, Entrega · main publica B y espera la aprobación"
-        ;;
-    arreglo)
-        parche=cambios/03-test-que-faltaba.patch
-        rama=plazo-para-todas-las-prioridades
-        titulo="Plazo de atención para todas las prioridades"
-        cuerpo="Añade el plazo de la prioridad baja y un test con las tres prioridades: el que le faltaba a la versión B."
-        esperado="los seis checks en verde; al integrarla, Entrega · main publica C"
-        ;;
-    cerrar)
-        cerrar
-        exit 0
-        ;;
-    *) uso ;;
-esac
-
-if ! git diff --quiet || ! git diff --cached --quiet; then
-    fallo "Hay cambios sin guardar. Guárdalos o descártalos antes de abrir la PR."
-fi
-git switch -q main
-if [[ "${SOLO_LOCAL:-0}" != 1 ]]; then   # en local no se toca la red: sirve aunque GitHub no responda
+comprobar_permiso() {
+    local permiso
     permiso="$(gh repo view --json viewerPermission --jq .viewerPermission 2>/dev/null || true)"
     if [[ "$permiso" != ADMIN && "$permiso" != MAINTAIN && "$permiso" != WRITE ]]; then
         fallo "La cuenta activa de gh no puede escribir en este repositorio (${permiso:-sin acceso}). Revisa: gh auth status · gh auth switch"
     fi
+}
+
+existe_en_github() {
+    git ls-remote --exit-code --heads origin "$1" >/dev/null 2>&1
+}
+
+preparar() {
+    if ! git diff --quiet || ! git diff --cached --quiet; then
+        fallo "Hay cambios sin guardar. Guárdalos o descártalos antes de preparar las ramas."
+    fi
+    comprobar_permiso
+    git switch -q main
     git pull -q --ff-only
-    if git ls-remote --exit-code --heads origin "$rama" >/dev/null; then
-        fallo "La rama $rama ya existe en GitHub (¿la PR sigue abierta?). Ciérrala con: bash scripts/abrir-pr.sh cerrar"
+    local cambio
+    for cambio in correcto incorrecto; do
+        datos "$cambio"
+        if existe_en_github "$rama"; then
+            echo "• $rama ya existe en GitHub: se deja como está."
+            continue
+        fi
+        git apply --check "$parche" 2>/dev/null \
+            || fallo "$parche no se aplica sobre main: main ya no está en el estado de partida de la demo."
+        if git show-ref --verify --quiet "refs/heads/$rama"; then
+            git branch -q -D "$rama"   # restos locales de un ensayo: se vuelve a crear igual
+        fi
+        git switch -q -c "$rama"
+        git apply "$parche"
+        git commit -q -am "$titulo"
+        if ! salida="$(git push -q -u origin HEAD 2>&1)"; then
+            echo "$salida" >&2
+            git switch -q main
+            fallo "No se pudo subir la rama $rama."
+        fi
+        git switch -q main
+        echo "✓ $rama creada y subida (cambio $cambio)."
+    done
+    echo "Listo. En clase: git switch plazo-de-atencion · bash scripts/comprobar.sh · bash scripts/abrir-pr.sh correcto"
+}
+
+abrir() {
+    datos "$1"
+    comprobar_permiso
+    existe_en_github "$rama" || fallo "La rama $rama no está en GitHub. Créala antes con: bash scripts/abrir-pr.sh preparar"
+    local abierta url checks
+    abierta="$(gh pr list --head "$rama" --state open --json url --jq '.[0].url // empty')"
+    [[ -z "$abierta" ]] || fallo "Ya hay una PR abierta para $rama: $abierta"
+    if git show-ref --verify --quiet "refs/heads/$rama"; then
+        git fetch -q origin "$rama"
+        if [[ "$(git rev-parse "$rama")" != "$(git rev-parse "origin/$rama")" ]]; then
+            fallo "Tu rama local $rama no coincide con la de GitHub: súbela (git push) o vuelve a la de GitHub."
+        fi
     fi
-fi
-if git show-ref --verify --quiet "refs/heads/$rama"; then
-    git branch -q -D "$rama"   # restos de un ensayo anterior: el parche la vuelve a crear igual
-fi
-if ! git apply --check "$parche" 2>/dev/null; then
-    if [[ "$1" == arreglo ]]; then
-        fallo "El arreglo se aplica sobre la versión B: integra antes la PR verde (bash scripts/abrir-pr.sh verde)."
+
+    url="$(gh pr create --base main --head "$rama" --title "$titulo" \
+        --body "$cuerpo"$'\n\n'"_Cambio de la demo de S18: \`$parche\`._")"
+
+    # GitHub tarda unos segundos en registrar los checks; hasta entonces «gh pr checks --watch» termina
+    # con «no checks reported». Se espera aquí (como mucho 40 s) para que el seguimiento funcione siempre.
+    for _ in $(seq 1 20); do
+        checks="$(gh pr checks "$url" --required --json name --jq length 2>/dev/null || echo 0)"
+        [[ "${checks:-0}" -gt 0 ]] && break
+        sleep 2
+    done
+
+    echo "✓ PR abierta: $url"
+    echo "  Se espera: $esperado."
+    echo "  Seguir los checks: gh pr checks $rama --watch --required"
+    if [[ "${SIN_NAVEGADOR:-0}" != 1 ]]; then
+        gh pr view "$url" --web >/dev/null 2>&1 || true
     fi
-    fallo "$parche no se aplica sobre main: main ya no está en el estado de partida de la demo."
-fi
+}
 
-git switch -q -c "$rama"
-if [[ "$1" == arreglo ]]; then
-    git apply --include='tests/*' "$parche"
-    echo "Solo el test nuevo:  $(resumen_pytest)"
-    git apply --exclude='tests/*' "$parche"
-    resultado="$(resumen_pytest)"
-    echo "Con el arreglo:      $resultado"
-    [[ "$resultado" != *failed* ]] || fallo "El arreglo no deja los tests en verde: revisa la rama $rama."
-else
-    git apply "$parche"
-fi
-git commit -q -am "$titulo"
+cerrar() {
+    comprobar_permiso
+    local cambio numero cerradas=0 cambios=(correcto incorrecto)
+    [[ -z "${1:-}" ]] || cambios=("$1")
+    for cambio in "${cambios[@]}"; do
+        datos "$cambio"
+        numero="$(gh pr list --head "$rama" --state open --json number --jq '.[0].number // empty')"
+        if [[ -n "$numero" ]]; then
+            gh pr close "$numero"
+            cerradas=$((cerradas + 1))
+        fi
+    done
+    echo "✓ PR de la demo cerradas: $cerradas. Las ramas siguen en GitHub para repetir la demo."
+}
 
-if [[ "${SOLO_LOCAL:-0}" == 1 ]]; then
-    if uv run --locked ruff check -q . >/dev/null 2>&1; then echo "ruff:   correcto"; else echo "ruff:   FALLA"; fi
-    echo "pytest: $(resumen_pytest)"
-    git switch -q main
-    echo "✓ Rama $rama creada en local, sin subir nada. En CI se esperaría: $esperado."
-    exit 0
-fi
+[[ $# -eq 1 || ( $# -eq 2 && "$1" == cerrar ) ]] || uso
+cd "$(git rev-parse --show-toplevel)"
+command -v gh >/dev/null || fallo "Falta la CLI de GitHub (gh)."
 
-if ! salida="$(git push -q -u origin HEAD 2>&1)"; then   # sin el aviso «Create a pull request…» de GitHub
-    echo "$salida" >&2
-    git switch -q main
-    fallo "No se pudo subir la rama $rama."
-fi
-url="$(gh pr create --base main --head "$rama" --title "$titulo" \
-    --body "$cuerpo"$'\n\n'"_Parche de la demo de S18: \`$parche\`._")"
-git switch -q main
-
-# GitHub tarda unos segundos en registrar los checks; hasta entonces «gh pr checks --watch» termina
-# con «no checks reported». Se espera aquí (como mucho 40 s) para que el seguimiento funcione siempre.
-for _ in $(seq 1 20); do
-    checks="$(gh pr checks "$url" --required --json name --jq length 2>/dev/null || echo 0)"
-    [[ "${checks:-0}" -gt 0 ]] && break
-    sleep 2
-done
-
-echo "✓ PR abierta: $url"
-echo "  Se espera: $esperado."
-echo "  Seguir los checks: gh pr checks $url --watch --required"
-if [[ "${SIN_NAVEGADOR:-0}" != 1 ]]; then
-    gh pr view "$url" --web >/dev/null 2>&1 || true
-fi
+case "$1" in
+    preparar) preparar ;;
+    correcto | incorrecto) abrir "$1" ;;
+    cerrar)
+        if [[ -n "${2:-}" ]]; then datos "$2"; fi   # valida el nombre del cambio
+        cerrar "${2:-}"
+        ;;
+    *) uso ;;
+esac
