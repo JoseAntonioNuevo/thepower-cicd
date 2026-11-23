@@ -65,7 +65,7 @@ class ProveedorDemo:
         categoria = "consulta"
         for palabras, candidata in [
             (("factura", "cobro", "cobrado", "pago"), "facturacion"),
-            (("entrar", "acceso", "contraseña", "cuenta"), "acceso"),
+            (("entrar", "acceso", "contraseña", "cuenta", "sesión"), "acceso"),
             (("error", "caído", "falla", "fallo"), "tecnico"),
         ]:
             if any(palabra in texto for palabra in palabras):

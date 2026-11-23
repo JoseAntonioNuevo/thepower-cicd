@@ -64,9 +64,9 @@ CodeQL (análisis de seguridad de GitHub) también se ejecuta en cada PR, pero n
 tarda más que el resto (≈1 min) y sus avisos se revisan en **Security**. En el ensayo del
 23/11/2026 los seis checks obligatorios terminaron en unos 30 segundos.
 
-La **evaluación** mide las reglas de la demo (gratis y deterministas: 11 de 12, porque las reglas
-no entienden «iniciar sesión»). Si se añade el secreto `OPENROUTER_API_KEY`, el mismo job evalúa
-el modelo real (12 llamadas de pago por ejecución). Mide al proveedor, no al endpoint: los fallos
+La **evaluación** mide las reglas de la demo (gratis y deterministas: aciertan las 12). Si se
+añade el secreto `OPENROUTER_API_KEY`, el mismo job evalúa el modelo real (12 llamadas de pago
+por ejecución). Mide al proveedor, no al endpoint: los fallos
 de la API los cubren los tests, el smoke y la vigilancia.
 
 Todas las acciones externas están fijadas al SHA completo de 40 caracteres (comprobado con
@@ -89,7 +89,7 @@ Requisitos: Python 3.12, [uv](https://docs.astral.sh/uv/) 0.13.7, Docker, `git`,
 uv sync --locked                       # exactamente lo que dice uv.lock
 uv run ruff check . && uv run ruff format --check .
 uv run pytest --cov                    # 38 pruebas, sin red
-uv run python -m evaluacion.evaluar    # 11/12 (91,7 %) · umbral 80 %
+uv run python -m evaluacion.evaluar    # 12/12 (100 %) · umbral 80 %
 ```
 
 La API en modo demo (reglas visibles, sin coste) y las dos comprobaciones:
