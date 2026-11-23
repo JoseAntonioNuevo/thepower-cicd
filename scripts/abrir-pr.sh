@@ -131,7 +131,11 @@ if [[ "${SOLO_LOCAL:-0}" == 1 ]]; then
     exit 0
 fi
 
-git push -q -u origin HEAD
+if ! salida="$(git push -q -u origin HEAD 2>&1)"; then   # sin el aviso «Create a pull request…» de GitHub
+    echo "$salida" >&2
+    git switch -q main
+    fallo "No se pudo subir la rama $rama."
+fi
 url="$(gh pr create --base main --head "$rama" --title "$titulo" \
     --body "$cuerpo"$'\n\n'"_Parche de la demo de S18: \`$parche\`._")"
 git switch -q main

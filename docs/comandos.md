@@ -33,6 +33,7 @@ como `v1.2.0` y vigilancia en verde.
 
 ```bash
 uv sync --locked
+gh auth status                                 # cuenta activa: la dueña del repositorio (gh auth switch)
 gh run list --limit 5                          # la última entrega en verde
 gh release list                                # v1.0.0
 gh issue list --label incidente --state open   # ninguna
@@ -69,8 +70,8 @@ gh pr view respuesta-por-defecto --json mergeStateStatus   # BLOCKED
 bash scripts/abrir-pr.sh cerrar        # cierra las dos y borra sus ramas
 ```
 
-En la de **calidad**, **Files changed** muestra la anotación de ruff (`F401 logging imported but
-unused`) en la línea del import. Si GitHub no responde: `SOLO_LOCAL=1 bash scripts/abrir-pr.sh tests`
+En la de **calidad**, **Files changed** muestra la anotación de ruff en la línea del import:
+``app.py:12:8: F401 `logging` imported but unused``. Si GitHub no responde: `SOLO_LOCAL=1 bash scripts/abrir-pr.sh tests`
 hace lo mismo en local y enseña `2 failed` (con `calidad`, «ruff: FALLA»).
 
 En la PR: los seis checks en paralelo, el botón de merge bloqueado y, en **Files changed**, las
