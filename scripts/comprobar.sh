@@ -25,12 +25,8 @@ if [[ ! -t 1 ]]; then VERDE=""; ROJO=""; GRIS=""; NEGRITA=""; NORMAL=""; fi
 COMMIT="$(git rev-parse HEAD)"
 TMP="$(mktemp -d)"
 CONTENEDOR="api-comprobar-$$"
-# shellcheck disable=SC2329  # la ejecuta el trap al salir
-limpiar() {
-    docker rm -f "$CONTENEDOR" >/dev/null 2>&1 || true
-    rm -rf "$TMP"
-}
-trap limpiar EXIT
+# Al salir, pase lo que pase: sin contenedor de prueba ni archivos temporales.
+trap 'docker rm -f "$CONTENEDOR" >/dev/null 2>&1 || true; rm -rf "$TMP"' EXIT
 
 rojos=()
 omitidos=()
