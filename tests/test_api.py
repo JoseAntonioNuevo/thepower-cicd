@@ -79,6 +79,18 @@ def test_respuesta_valida():
     assert doble.llamadas == 1
 
 
+@pytest.mark.parametrize(("prioridad", "horas"), [("alta", 4), ("media", 24), ("baja", 72)])
+def test_cada_prioridad_tiene_su_plazo_de_atencion(prioridad, horas):
+    class DobleConPrioridad(DobleCorrecto):
+        async def clasificar(self, texto: str) -> Clasificacion:
+            return Clasificacion(categoria="consulta", prioridad=prioridad, respuesta="Ok.")
+
+    with TestClient(crear_app(DobleConPrioridad())) as cliente:
+        respuesta = cliente.post("/clasificar", json={"texto": "Tengo una duda"})
+    assert respuesta.status_code == 200
+    assert respuesta.json()["sla_horas"] == horas
+
+
 # ------------------------------------------------- caso 2: entrada inválida
 @pytest.mark.parametrize(
     "cuerpo",
