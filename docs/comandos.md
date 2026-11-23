@@ -28,9 +28,9 @@ Pestañas abiertas antes de conectar: el repositorio, **Actions**, **Pull reques
 
 | Paso | Tiempo |
 |---|---|
-| `scripts/comprobar.sh` (seis checks en local, con la imagen de Docker en caché) | ≈10 s (`--rapido`: ≈3 s) |
+| `scripts/comprobar.sh` (seis checks en local, con la imagen de Docker en caché) | ≈5 s (la primera vez, más: construye la imagen) |
 | Abrir una PR con `scripts/abrir-pr.sh` | ≈10 s |
-| Seis checks obligatorios de una PR | 20–30 s (CodeQL ≈1 min aparte; CodeRabbit ≈3 min) |
+| Seis checks obligatorios de una PR | 25–30 s (CodeQL ≈1 min aparte; CodeRabbit ≈3 min) |
 | `Entrega · main` hasta pedir la aprobación (checks, publicar, staging) | ≈75 s |
 | Producción tras aprobar (+ panel) | ≈15 s (+ 30 s) |
 | Vigilancia (+ panel) | ≈30 s (+ 25 s) |
@@ -68,7 +68,7 @@ git show --stat HEAD && git diff main -- app.py   # qué cambia: SLA_HORAS y sla
 bash scripts/comprobar.sh                      # ✅ 6/6 en verde · 41 passed
 bash scripts/abrir-pr.sh correcto              # abre la PR (y el navegador)
 gh pr checks plazo-de-atencion --watch --required   # los seis en verde
-gh pr view plazo-de-atencion --json mergeStateStatus  # CLEAN: se puede integrar (se integra en el bloque 3)
+gh pr view plazo-de-atencion --json mergeStateStatus  # CLEAN, o UNSTABLE mientras terminan CodeQL y CodeRabbit (no obligatorios): se puede integrar; se integra en el bloque 3
 ```
 
 ### 2. El cambio incorrecto

@@ -27,6 +27,20 @@ real del ensayo (diapositivas 35 y 37): con un cambio correcto no hay nada que e
 La teoría y la demo se alternan: cada bloque termina en algo que se ve en pantalla y en una
 pregunta para el grupo. La práctica posterior es **opcional** (aclaración de Laura del 04/11).
 
+### Las diapositivas y el directo
+
+La presentación no cambia: sus diapositivas de demo enseñan el **ensayo** del 23/11 (la versión B,
+en verde pero con un fallo escondido). En directo se hace el recorrido nuevo, y cada una sirve así:
+
+| Diapositiva | Lo que enseña | Cómo usarla en directo |
+|---|---|---|
+| 15 · Demo 1 | El cambio incorrecto (la respuesta inventada) y `2 failed` en Tests | Después de las dos PR: por qué falla la roja. La verde no tiene diapositiva: se ve en pantalla |
+| 16 · CodeRabbit | Su revisión en un ensayo anterior: vio el problema y propuso cambiar los tests | Comparar con lo que comente hoy en la PR roja (ver bloque 2) |
+| 24 · Demo 2 | El resumen de «Imagen publicada» de B en el ensayo | Los pasos son los mismos; en directo, el del cambio correcto |
+| 31 · Demo 3 | B en el ensayo: en verde, aprobada como `v1.1.0` y con el plazo solo para alta y media | Contraste: «también estaba en verde». Hoy se aprueba el cambio correcto, que trae las tres prioridades y su test |
+| 35 · Demo 4 | La incidencia real que abrió la vigilancia con B | Lo que pasa cuando un fallo no tiene test; en directo, la vigilancia sale en verde |
+| 38 · Demo 5 | El rollback del ensayo (A → B → A → C) | En directo, simulacro: `v1.1.0` → `v1.0.0` → `v1.1.0` |
+
 ## Antes de conectar
 
 - `gh auth status`: la cuenta **activa** debe ser `JoseAntonioNuevo`; `scripts/abrir-pr.sh` se
@@ -117,9 +131,13 @@ rollback → arreglo) queda como el ensayo real que enseñan las diapositivas 25
      ruff en la línea del diff y el merge **bloqueado** por la regla de `main`.
   3. Moraleja: el build y el arranque funcionan en los dos casos; lo que separa uno de otro son
      los tests y el análisis. Cada check atrapa un tipo de error distinto.
-- **CodeRabbit (16):** comenta la PR roja a los ≈3 min (no cerrarla antes). En el ensayo acertó el
-  problema, pero propuso «actualizar los tests al nuevo contrato», que dejaría pasar el fallo.
-  Decide una persona; lo que bloquea es el test. Después: `bash scripts/abrir-pr.sh cerrar incorrecto`.
+- **CodeRabbit (16):** comenta la PR roja a los ≈3 min (no cerrarla antes). La diapositiva enseña
+  un ensayo en el que acertó el problema pero propuso «actualizar los tests al nuevo contrato», que
+  dejaría pasar el fallo. En el ensayo de este mismo cambio (PR #19, 23/11 por la noche) pidió
+  quitar el import y **propuso el arreglo correcto** («quitar la respuesta por defecto para que un
+  fallo del proveedor devuelva 504»); en la verde no comentó nada. Mensaje: el revisor con IA no es
+  determinista; el test sí. Decide una persona y bloquea el test. Después:
+  `bash scripts/abrir-pr.sh cerrar incorrecto`.
 - **Ruleset y acciones por SHA (17):** un tag se puede mover; un SHA no.
 - **Alternativas (18–19):** cambia quién mantiene la máquina; las garantías de la clase no.
 - **Preguntas:** «¿Por qué el fallo lo detecta un test y no el build de Docker?» y «¿Por qué el
@@ -148,7 +166,9 @@ rollback → arreglo) queda como el ensayo real que enseñan las diapositivas 25
   `produccion` pasa a ese digest (se comprueba) y se crea la release `v1.1.0`.
 - **Progresivos (29)** y **sin corte (30):** en vivo `uv run python extras/despliegue_sin_corte.py`
   (sin corte 0 fallos; parar y arrancar ≈60).
-- **Demo 3 (31):** aprobar producción en **Review deployments** y abrir la release y el panel.
+- **Demo 3 (31):** aprobar producción en **Review deployments** y abrir la release y el panel. La
+  diapositiva enseña B en el ensayo (también en verde, pero sin plazo para «baja»): es el contraste
+  con el cambio de hoy, que sí trae las tres prioridades y su test.
 - **Pregunta:** «¿Qué diferencia hay entre "el job está en verde" y "producción ejecuta la v1.1.0"?».
 
 ### 19:34 · Bloque 5 · Observabilidad y rollback (32–38)
@@ -163,7 +183,7 @@ rollback → arreglo) queda como el ensayo real que enseñan las diapositivas 25
   pasa cuando un fallo no tiene test: hoy, el cambio correcto trae un test por prioridad.
 - **Demo 4 (37):** lanzar `Vigilancia · producción` contra la `v1.1.0`: tres peticiones, una por
   prioridad, todas 200; ninguna incidencia; el panel con la versión nueva.
-- **Demo 5 (38) · rollback como simulacro:** `Rollback · producción` con `v1.0.0`, aprobado. Sin
+- **Demo 5 (38) · rollback como simulacro** (la diapositiva enseña el rollback real del ensayo): `Rollback · producción` con `v1.0.0`, aprobado. Sin
   reconstruir: prueba esa imagen y le devuelve la etiqueta. Vigilancia en verde con `v1.0.0` y
   vuelta a `v1.1.0` con el mismo workflow. Los equipos ensayan el rollback antes de necesitarlo.
 - **Pregunta:** «¿El rollback arregla el código?».
