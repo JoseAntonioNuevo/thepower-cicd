@@ -37,6 +37,10 @@ class Clasificacion(BaseModel):
     respuesta: str = Field(min_length=1, max_length=500)
 
 
+# Plazo de atención en horas según la prioridad: hay uno para cada prioridad posible.
+SLA_HORAS = {"alta": 4, "media": 24, "baja": 72}
+
+
 class ErrorProveedor(Exception):
     """El proveedor falló. Solo guarda un código público, nunca el cuerpo remoto."""
 
@@ -285,6 +289,7 @@ def crear_app(proveedor: Proveedor | None = None) -> FastAPI:
             "version": version,
             "request_id": request.state.request_id,
             "resultado": resultado.model_dump(),
+            "sla_horas": SLA_HORAS[resultado.prioridad],
         }
 
     return app
