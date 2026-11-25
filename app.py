@@ -9,6 +9,7 @@ prioridad y respuesta. Añadimos lo que necesita una entrega automática:
 """
 
 import json
+import logging
 import os
 import time
 import traceback
@@ -276,6 +277,13 @@ def crear_app(proveedor: Proveedor | None = None) -> FastAPI:
         inicio = time.perf_counter()
         try:
             resultado = await proveedor.clasificar(incidencia.texto)
+        except ErrorProveedor:
+            # «Mejora» bienintencionada: si el proveedor falla, respondemos algo por defecto.
+            resultado = Clasificacion(
+                categoria="consulta",
+                prioridad="media",
+                respuesta="Hemos recibido tu incidencia y la revisaremos.",
+            )
         finally:
             # Tiempo del proveedor aparte del total: distingue nuestra API del modelo.
             request.state.detalle["proveedor_ms"] = round((time.perf_counter() - inicio) * 1000, 1)
